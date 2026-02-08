@@ -53,6 +53,14 @@ export default function FocusablePressable({
     }
   }, [autoFocus]);
 
+  // Keep focusedSettingAction in sync when onPress changes while focused
+  // (prevents stale closures after a setting value cycles)
+  useEffect(() => {
+    if (isFocused && onPress) {
+      usePlayerStore.getState().setFocusedSettingAction(onPress);
+    }
+  }, [isFocused, onPress]);
+
   const handleFocus = useCallback(
     (e: any) => {
       setIsFocused(true);

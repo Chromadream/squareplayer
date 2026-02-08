@@ -37,13 +37,7 @@ export interface ThemeColors {
   overlayLight: string;       // Focused item background
 
   // Diagram-specific (controller diagram in SettingsScreen)
-  diagramButton1: string;     // SNES X / Saturn X (was blue)
-  diagramButton2: string;     // SNES Y / Saturn Y (was green)
-  diagramButton3: string;     // SNES A / Saturn A (was red)
-  diagramButton4: string;     // SNES B / Saturn B (was yellow)
-  diagramButton5: string;     // Saturn Z (was purple)
-  diagramButton6: string;     // Saturn C (was orange)
-  diagramChrome: string;      // Shoulder/trigger/menu button bg
+  diagramChrome: string;      // Shoulder/trigger/menu/face button bg
   diagramChromeDim: string;   // D-pad center, trigger buttons
   diagramLabel: string;       // Shoulder/trigger label text
   diagramLabelDim: string;    // D-pad arrows, trigger labels, menu labels
@@ -111,13 +105,7 @@ export function mapPaletteToTheme(
       overlayMedium: 'rgba(0, 0, 0, 0.60)',
       overlayLight: withAlpha(n1[2], 0.12),
 
-      // Diagram buttons — distinct accent tones
-      diagramButton1: a1[5],    // shade 300
-      diagramButton2: a2[5],    // shade 300
-      diagramButton3: a3[5],    // shade 300
-      diagramButton4: a1[7],    // shade 500
-      diagramButton5: a2[7],    // shade 500
-      diagramButton6: a3[7],    // shade 500
+      // Diagram chrome
       diagramChrome: withAlpha(n1[2], 0.12),
       diagramChromeDim: withAlpha(n1[2], 0.06),
       diagramLabel: n2[4],      // shade 200
@@ -169,13 +157,7 @@ export function mapPaletteToTheme(
     overlayMedium: 'rgba(0, 0, 0, 0.45)',
     overlayLight: withAlpha(n1[12], 0.10),  // slightly stronger for visible focus on light bg
 
-    // Diagram buttons — darker accent tones for light bg
-    diagramButton1: a1[7],      // shade 500
-    diagramButton2: a2[7],      // shade 500
-    diagramButton3: a3[7],      // shade 500
-    diagramButton4: a1[8],      // shade 600
-    diagramButton5: a2[8],      // shade 600
-    diagramButton6: a3[8],      // shade 600
+    // Diagram chrome
     diagramChrome: withAlpha(n1[12], 0.08),
     diagramChromeDim: withAlpha(n1[12], 0.04),
     diagramLabel: n2[8],        // shade 600

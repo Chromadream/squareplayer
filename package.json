@@ -1,6 +1,6 @@
 {
   "name": "squareplayer",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "scripts": {
     "android": "react-native run-android",
@@ -11,7 +11,7 @@
     "build:apk": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleDebug",
     "build:android": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk",
     "build:apk:release": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease",
-    "build:android:release": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease && adb install -r app/build/outputs/apk/release/app-release.apk"
+    "build:android:release": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease && adb install -r app/build/outputs/apk/release/app-arm64-v8a-release.apk"
   },
   "dependencies": {
     "@op-engineering/op-sqlite": "^15.2.5",

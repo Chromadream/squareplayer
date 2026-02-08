@@ -40,8 +40,10 @@ const KEYCODE_MEDIA_NEXT = 87;
 const KEYCODE_MEDIA_PREVIOUS = 88;
 
 // Repeat mode cycle order
-const REPEAT_MODES = [RepeatMode.Track, RepeatMode.Queue, RepeatMode.Off];
-const REPEAT_MODE_NAMES = ['Repeat Track', 'Repeat Queue', 'Repeat Off'];
+const REPEAT_MODES = [
+  { mode: RepeatMode.Track, name: 'Repeat Track' },
+  { mode: RepeatMode.Queue, name: 'Repeat Queue' },
+];
 
 function isTrackRow(item: any): item is TrackRow {
   return item && typeof item === 'object' && 'uri' in item && 'fileName' in item;
@@ -430,10 +432,11 @@ async function togglePlayPause(): Promise<void> {
 
 async function cycleRepeatMode(): Promise<void> {
   const current = await TrackPlayer.getRepeatMode();
-  const currentIndex = REPEAT_MODES.indexOf(current);
+  const currentIndex = REPEAT_MODES.findIndex(r => r.mode === current);
   const nextIndex = (currentIndex + 1) % REPEAT_MODES.length;
-  await TrackPlayer.setRepeatMode(REPEAT_MODES[nextIndex]);
-  usePlayerStore.getState().showStatus(REPEAT_MODE_NAMES[nextIndex]);
+  const next = REPEAT_MODES[nextIndex];
+  await TrackPlayer.setRepeatMode(next.mode);
+  usePlayerStore.getState().showStatus(next.name);
 }
 
 async function skipToPrev(state: ReturnType<typeof usePlayerStore.getState>): Promise<void> {

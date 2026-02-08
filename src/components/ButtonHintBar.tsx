@@ -120,10 +120,9 @@ const createStyles = (c: import('../theme/colors').ThemeColors) => StyleSheet.cr
   },
   buttonBadge: {
     backgroundColor: c.textPrimary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 6,
-    minWidth: 28,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
     elevation: 2,

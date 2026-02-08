@@ -31,7 +31,7 @@ export default function SetupScreen({
       </FocusablePressable>
 
       <Text style={styles.hint}>
-        Choose a folder containing your FLAC files
+        Choose a folder containing your music files
       </Text>
     </View>
   );
@@ -46,24 +46,26 @@ const createStyles = (c: import('../theme/colors').ThemeColors) => StyleSheet.cr
     padding: 40,
   },
   button: {
-    backgroundColor: c.surfaceVariant,
-    paddingHorizontal: 32,
-    paddingVertical: 16,
-    borderRadius: 10,
+    backgroundColor: c.accentPrimaryMuted,
+    paddingHorizontal: 40,
+    paddingVertical: 18,
+    borderRadius: 100,
     borderWidth: 2,
-    borderColor: c.border,
+    borderColor: 'transparent',
+    elevation: 0,
   },
   buttonFocused: {
     borderColor: c.accentPrimary,
-    backgroundColor: c.accentPrimaryMuted,
+    elevation: 2,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: c.textPrimary,
-    fontSize: 16,
-    fontWeight: '600',
+    color: c.accentPrimary,
+    fontSize: 15,
+    fontWeight: '500',
+    letterSpacing: 0.4,
   },
   hint: {
     color: c.textFaint,

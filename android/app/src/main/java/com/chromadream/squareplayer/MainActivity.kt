@@ -48,6 +48,12 @@ class MainActivity : ReactActivity() {
       DefaultReactActivityDelegate(this, mainComponentName, fabricEnabled)
 
   override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+    // Let volume keys pass through to the system
+    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+        keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+        keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+      return super.onKeyDown(keyCode, event)
+    }
     // Forward key events to react-native-keyevent, prevent repeat events
     if (event?.repeatCount == 0) {
       KeyEventModule.getInstance().onKeyDownEvent(keyCode, event)
@@ -57,6 +63,12 @@ class MainActivity : ReactActivity() {
   }
 
   override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+    // Let volume keys pass through to the system
+    if (keyCode == KeyEvent.KEYCODE_VOLUME_UP ||
+        keyCode == KeyEvent.KEYCODE_VOLUME_DOWN ||
+        keyCode == KeyEvent.KEYCODE_VOLUME_MUTE) {
+      return super.onKeyUp(keyCode, event)
+    }
     KeyEventModule.getInstance().onKeyUpEvent(keyCode, event)
     super.onKeyUp(keyCode, event)
     return true
