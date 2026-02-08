@@ -34,25 +34,24 @@ export default function LibraryScreen(): React.JSX.Element {
 
   const flatListRef = useRef<FlatList>(null);
   const [scrollIndex, setScrollIndex] = useState(0);
+  const lastScrolledTrackId = useRef<number | null>(null);
 
   // Build combined list: favorites folder first, then real folders, then root tracks
-  const favoritesFolderItem: LibraryItem = {
-    type: 'folder' as const,
-    data: {
-      id: -1,
-      uri: '__favorites__',
-      name: 'Favorites',
-      isAlbumExperience: 0,
-      coverArtUri: null,
-      trackCount: favoriteTracks.length,
+  const items: LibraryItem[] = useMemo(() => [
+    {
+      type: 'folder' as const,
+      data: {
+        id: -1,
+        uri: '__favorites__',
+        name: 'Favorites',
+        isAlbumExperience: 0,
+        coverArtUri: null,
+        trackCount: favoriteTracks.length,
+      },
     },
-  };
-
-  const items: LibraryItem[] = [
-    favoritesFolderItem,
     ...folders.map(f => ({ type: 'folder' as const, data: f })),
     ...rootTracks.map(t => ({ type: 'track' as const, data: t })),
-  ];
+  ], [favoriteTracks.length, folders, rootTracks]);
 
   // Index of the now-playing item (folder containing track, or root track)
   const nowPlayingIndex = useMemo(() => {
@@ -67,11 +66,11 @@ export default function LibraryScreen(): React.JSX.Element {
   // The item that should receive autoFocus: now-playing item if any, otherwise first
   const autoFocusIndex = nowPlayingIndex >= 0 ? nowPlayingIndex : 0;
 
-  // Scroll to the now-playing item when the screen mounts / items change
+  // Scroll to the now-playing item once on mount or when the playing track changes
+  const currentTrackId = currentTrack?.id ?? null;
   useEffect(() => {
-    if (autoFocusIndex > 0 && items.length > 0) {
-      console.log('[LibraryScreen] autoFocusIndex:', autoFocusIndex, 'nowPlayingIndex:', nowPlayingIndex);
-      console.log('[LibraryScreen] Item at autoFocusIndex:', items[autoFocusIndex]);
+    if (autoFocusIndex > 0 && items.length > 0 && currentTrackId !== lastScrolledTrackId.current) {
+      lastScrolledTrackId.current = currentTrackId;
       // Delay to ensure FlatList has completed layout, then scroll
       const timer = setTimeout(() => {
         flatListRef.current?.scrollToIndex({
@@ -79,11 +78,10 @@ export default function LibraryScreen(): React.JSX.Element {
           animated: false,
           viewPosition: 0.3,
         });
-        console.log('[LibraryScreen] Scrolled to index', autoFocusIndex);
       }, 250);
       return () => clearTimeout(timer);
     }
-  }, [autoFocusIndex, items.length, nowPlayingIndex, items]);
+  }, [autoFocusIndex, items.length, currentTrackId]);
 
   // Page scroll via store action (L1/R1)
   useEffect(() => {
