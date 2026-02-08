@@ -1,13 +1,16 @@
-package com.squareplayer.metadata
+package com.chromadream.squareplayer.notification
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.uimanager.ViewManager
 
-class MetadataExtractorPackage : ReactPackage {
+class MetadataProgressPackage : ReactPackage {
     override fun createNativeModules(reactContext: ReactApplicationContext): List<NativeModule> {
-        return listOf(MetadataExtractorModule(reactContext))
+        return listOf(
+            MetadataProgressModule(reactContext),
+            NotificationPermissionModule(reactContext)
+        )
     }
 
     override fun createViewManagers(reactContext: ReactApplicationContext): List<ViewManager<*, *>> {

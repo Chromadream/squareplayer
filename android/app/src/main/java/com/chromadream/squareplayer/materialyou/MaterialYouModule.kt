@@ -1,4 +1,4 @@
-package com.squareplayer.materialyou
+package com.chromadream.squareplayer.materialyou
 
 import androidx.core.content.ContextCompat
 import com.facebook.react.bridge.*

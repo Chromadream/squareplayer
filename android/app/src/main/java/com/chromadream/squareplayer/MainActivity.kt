@@ -1,4 +1,4 @@
-package com.squareplayer
+package com.chromadream.squareplayer
 
 import android.os.Bundle
 import android.view.KeyEvent

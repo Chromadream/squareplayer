@@ -1,4 +1,4 @@
-package com.squareplayer.focus
+package com.chromadream.squareplayer.focus
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule

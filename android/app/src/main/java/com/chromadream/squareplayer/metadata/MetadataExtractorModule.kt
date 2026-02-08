@@ -1,4 +1,4 @@
-package com.squareplayer.metadata
+package com.chromadream.squareplayer.metadata
 
 import android.media.MediaMetadataRetriever
 import android.net.Uri

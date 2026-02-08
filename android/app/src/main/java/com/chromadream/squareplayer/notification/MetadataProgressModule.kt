@@ -1,4 +1,4 @@
-package com.squareplayer.notification
+package com.chromadream.squareplayer.notification
 
 import android.Manifest
 import android.app.NotificationChannel

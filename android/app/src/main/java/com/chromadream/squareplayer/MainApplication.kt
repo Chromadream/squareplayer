@@ -1,4 +1,4 @@
-package com.squareplayer
+package com.chromadream.squareplayer
 
 import android.app.Application
 import com.facebook.react.PackageList
@@ -6,10 +6,10 @@ import com.facebook.react.ReactApplication
 import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
-import com.squareplayer.metadata.MetadataExtractorPackage
-import com.squareplayer.notification.MetadataProgressPackage
-import com.squareplayer.focus.FocusHelperPackage
-import com.squareplayer.materialyou.MaterialYouPackage
+import com.chromadream.squareplayer.metadata.MetadataExtractorPackage
+import com.chromadream.squareplayer.notification.MetadataProgressPackage
+import com.chromadream.squareplayer.focus.FocusHelperPackage
+import com.chromadream.squareplayer.materialyou.MaterialYouPackage
 
 class MainApplication : Application(), ReactApplication {
 

@@ -1,4 +1,4 @@
-package com.squareplayer.focus
+package com.chromadream.squareplayer.focus
 
 import com.facebook.react.bridge.ReactApplicationContext
 import com.facebook.react.bridge.ReactContextBaseJavaModule

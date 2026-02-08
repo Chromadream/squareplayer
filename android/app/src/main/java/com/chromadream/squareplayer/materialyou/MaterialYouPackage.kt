@@ -1,4 +1,4 @@
-package com.squareplayer.materialyou
+package com.chromadream.squareplayer.materialyou
 
 import com.facebook.react.ReactPackage
 import com.facebook.react.bridge.NativeModule
