@@ -1,13 +1,18 @@
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
   ScrollView,
   StyleSheet,
+  Alert,
 } from 'react-native';
 import { usePlayerStore } from '../store/playerStore';
-import type { ControllerLayout } from '../store/playerStore';
+import type { ControllerLayout, StandardXAction } from '../store/playerStore';
 import FocusablePressable from '../components/FocusablePressable';
+import { scanLibrary } from '../services/scanner';
+import { startMetadataParsing } from '../services/metadataParser';
+import MetadataProgressNotification from '../native/MetadataProgress';
+import NotificationPermission from '../native/NotificationPermission';
 
 const SEEK_OPTIONS = [5, 10, 15, 30];
 const LARGE_SEEK_OPTIONS = [15, 30, 60];
@@ -49,7 +54,7 @@ function TriggerLabels({ largeSeek }: { largeSeek: number }): React.JSX.Element 
 }
 
 /** SNES-style diamond: X top, Y left, A right, B bottom */
-function SNESDiagram(): React.JSX.Element {
+function SNESDiagram({ xAction }: { xAction: StandardXAction }): React.JSX.Element {
   return (
     <View style={diagramStyles.faceContainer}>
       {/* Top: X */}
@@ -58,7 +63,9 @@ function SNESDiagram(): React.JSX.Element {
         <View style={[diagramStyles.faceButton, { backgroundColor: '#4a7ccc' }]}>
           <Text style={diagramStyles.faceLabel}>X</Text>
         </View>
-        <Text style={diagramStyles.diamondActionRight}>Repeat</Text>
+        <Text style={diagramStyles.diamondActionRight}>
+          {xAction === 'favorite' ? 'Favorite' : 'Repeat'}
+        </Text>
       </View>
       {/* Middle: Y left, A right */}
       <View style={diagramStyles.diamondMiddle}>
@@ -94,7 +101,7 @@ function SaturnDiagram(): React.JSX.Element {
           <View style={[diagramStyles.saturnButton, { backgroundColor: '#4a7ccc' }]}>
             <Text style={diagramStyles.faceLabel}>X</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Repeat</Text>
+          <Text style={diagramStyles.saturnAction}>Favorite</Text>
         </View>
         <View style={diagramStyles.saturnButtonGroup}>
           <View style={[diagramStyles.saturnButton, { backgroundColor: '#5aa655' }]}>
@@ -106,7 +113,7 @@ function SaturnDiagram(): React.JSX.Element {
           <View style={[diagramStyles.saturnButton, { backgroundColor: '#8855aa' }]}>
             <Text style={diagramStyles.faceLabel}>Z</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Restart</Text>
+          <Text style={diagramStyles.saturnAction}>Repeat</Text>
         </View>
       </View>
       {/* Bottom row: A B C */}
@@ -127,7 +134,7 @@ function SaturnDiagram(): React.JSX.Element {
           <View style={[diagramStyles.saturnButton, { backgroundColor: '#cc7a33' }]}>
             <Text style={diagramStyles.faceLabel}>C</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Shuffle</Text>
+          <Text style={diagramStyles.saturnAction}>Restart</Text>
         </View>
       </View>
     </View>
@@ -137,9 +144,11 @@ function SaturnDiagram(): React.JSX.Element {
 function ControllerDiagram({
   layout,
   largeSeek,
+  xAction,
 }: {
   layout: ControllerLayout;
   largeSeek: number;
+  xAction: StandardXAction;
 }): React.JSX.Element {
   return (
     <View style={diagramStyles.container}>
@@ -177,7 +186,7 @@ function ControllerDiagram({
           <Text style={diagramStyles.dpadAction}>Seek / Skip</Text>
         </View>
         {/* Face buttons on right */}
-        {layout === 'standard' ? <SNESDiagram /> : <SaturnDiagram />}
+        {layout === 'standard' ? <SNESDiagram xAction={xAction} /> : <SaturnDiagram />}
       </View>
       {/* Menu buttons */}
       <View style={diagramStyles.menuRow}>
@@ -203,18 +212,26 @@ function ControllerDiagram({
 export default function SettingsScreen(): React.JSX.Element {
   const {
     controllerLayout,
+    standardXAction,
     seekAmount,
     largeSeekAmount,
     showButtonHints,
     setControllerLayout,
+    setStandardXAction,
     setSeekAmount,
     setLargeSeekAmount,
     setShowButtonHints,
   } = usePlayerStore();
 
+  const [isScanning, setIsScanning] = useState(false);
+
   const cycleLayout = useCallback(() => {
     setControllerLayout(controllerLayout === 'standard' ? 'sixbutton' : 'standard');
   }, [controllerLayout, setControllerLayout]);
+
+  const cycleXAction = useCallback(() => {
+    setStandardXAction(standardXAction === 'favorite' ? 'repeat' : 'favorite');
+  }, [standardXAction, setStandardXAction]);
 
   const cycleSeek = useCallback(() => {
     const idx = SEEK_OPTIONS.indexOf(seekAmount);
@@ -232,6 +249,38 @@ export default function SettingsScreen(): React.JSX.Element {
     setShowButtonHints(!showButtonHints);
   }, [showButtonHints, setShowButtonHints]);
 
+  const handleRescanLibrary = useCallback(async () => {
+    // Request notification permission first
+    try {
+      await NotificationPermission.requestPermission();
+    } catch (error) {
+      console.warn('Failed to request notification permission:', error);
+    }
+    
+    setIsScanning(true);
+    // Show native notification so Android keeps us alive in background
+    MetadataProgressNotification.show(0).catch(() => {});
+    try {
+      await scanLibrary(progress => {
+        if (progress.phase !== 'done') {
+          const label = `${progress.phase}: ${progress.currentName ?? ''} (${progress.current}/${progress.total})`;
+          MetadataProgressNotification.update(progress.current, 0, label).catch(() => {});
+        }
+      }, true);
+      // Start background metadata parsing with native progress notification
+      startMetadataParsing();
+      Alert.alert('Scan Complete', 'Library has been rescanned. Metadata is loading in the background.');
+    } catch (error) {
+      MetadataProgressNotification.dismiss().catch(() => {});
+      Alert.alert(
+        'Scan Failed',
+        error instanceof Error ? error.message : 'Failed to scan library',
+      );
+    } finally {
+      setIsScanning(false);
+    }
+  }, []);
+
   return (
     <View style={styles.container}>
       <View style={styles.header}>
@@ -240,6 +289,24 @@ export default function SettingsScreen(): React.JSX.Element {
       </View>
 
       <ScrollView contentContainerStyle={styles.content}>
+        {/* Library */}
+        <Text style={styles.sectionTitle}>Library</Text>
+
+        <FocusablePressable
+          onPress={handleRescanLibrary}
+          style={styles.optionRow}
+          focusedStyle={styles.optionFocused}
+          disabled={isScanning}
+        >
+          <View style={styles.optionContent}>
+            <Text style={styles.optionLabel}>Rescan Library</Text>
+            <Text style={styles.optionValue}>
+              {isScanning ? 'Scanning...' : 'Update music collection'}
+            </Text>
+          </View>
+          <Text style={styles.optionChevron}>↻</Text>
+        </FocusablePressable>
+
         {/* Controller Layout */}
         <Text style={styles.sectionTitle}>Controller</Text>
 
@@ -259,8 +326,24 @@ export default function SettingsScreen(): React.JSX.Element {
           <Text style={styles.optionChevron}>⟳</Text>
         </FocusablePressable>
 
+        {controllerLayout === 'standard' && (
+          <FocusablePressable
+            onPress={cycleXAction}
+            style={styles.optionRow}
+            focusedStyle={styles.optionFocused}
+          >
+            <View style={styles.optionContent}>
+              <Text style={styles.optionLabel}>X Button (Now Playing)</Text>
+              <Text style={styles.optionValue}>
+                {standardXAction === 'favorite' ? 'Favorite' : 'Repeat'}
+              </Text>
+            </View>
+            <Text style={styles.optionChevron}>⟳</Text>
+          </FocusablePressable>
+        )}
+
         {/* Controller Diagram */}
-        <ControllerDiagram layout={controllerLayout} largeSeek={largeSeekAmount} />
+        <ControllerDiagram layout={controllerLayout} largeSeek={largeSeekAmount} xAction={standardXAction} />
 
         {/* Seek Settings */}
         <Text style={styles.sectionTitle}>Seek</Text>

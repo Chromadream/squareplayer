@@ -10,11 +10,14 @@ export interface TrackMetadata {
   sampleRate: number; // Hz
   bitDepth: number;
   trackNumber: number;
+  discNumber: number;
 }
 
 interface MetadataExtractorInterface {
   extract(uri: string): Promise<TrackMetadata>;
   extractCoverArt(uri: string): Promise<string | null>;
+  /** Copy a SAF content:// URI to local cache, returning a file:// path */
+  cacheSafFile(uri: string): Promise<string>;
 }
 
 const { MetadataExtractor } = NativeModules;

@@ -65,15 +65,3 @@ export function encodeContentUri(
   // Fallback without tree root (shouldn't happen in normal flow)
   return uri;
 }
-
-/**
- * Encode a content URI if present, otherwise return undefined.
- * Convenience wrapper for optional artwork / track URIs.
- */
-export function encodeOptionalUri(
-  uri: string | null | undefined,
-  treeRootUri?: string | null,
-): string | undefined {
-  if (!uri) return undefined;
-  return encodeContentUri(uri, treeRootUri);
-}

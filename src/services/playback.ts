@@ -37,6 +37,7 @@ export async function setupPlayer(): Promise<void> {
   } catch (error) {
     // Player may already be set up
     console.warn('TrackPlayer setup error (may already be initialized):', error);
+    console.warn('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
   }
 }
 

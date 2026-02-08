@@ -8,8 +8,11 @@
     "lint": "eslint .",
     "start": "react-native start",
     "test": "jest",
+    "clean:android": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew clean",
     "build:apk": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleDebug",
-    "build:apk:release": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease"
+    "build:android": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleDebug && adb install -r app/build/outputs/apk/debug/app-debug.apk",
+    "build:apk:release": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease",
+    "build:android:release": "cd android && JAVA_HOME=/usr/lib/jvm/java-17-openjdk ./gradlew assembleRelease && adb install -r app/build/outputs/apk/release/app-release.apk"
   },
   "dependencies": {
     "@op-engineering/op-sqlite": "^15.2.5",

@@ -13,8 +13,8 @@ export default function SetupScreen({
 }: SetupScreenProps): React.JSX.Element {
   return (
     <View style={styles.container}>
-      <Text style={styles.appTitle}>SquarePlayer</Text>
-      <Text style={styles.subtitle}>FLAC Music Player</Text>
+      <Text style={styles.appTitle}>squareplayer</Text>
+      <Text style={styles.subtitle}>Opinionated Music Player for Retroid Pocket Classic/Ayaneo Pocket DMG</Text>
 
       <FocusablePressable
         onPress={onPickFolder}

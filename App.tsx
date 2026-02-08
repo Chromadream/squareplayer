@@ -12,6 +12,8 @@ import {
   startMetadataParsing,
   stopMetadataParsing,
 } from './src/services/metadataParser';
+import MetadataProgressNotification from './src/native/MetadataProgress';
+import NotificationPermission from './src/native/NotificationPermission';
 import NowPlayingScreen from './src/screens/NowPlayingScreen';
 import LibraryScreen from './src/screens/LibraryScreen';
 import FolderScreen from './src/screens/FolderScreen';
@@ -19,6 +21,7 @@ import SetupScreen from './src/screens/SetupScreen';
 import SettingsScreen from './src/screens/SettingsScreen';
 import TrackInfoOverlay from './src/components/TrackInfoOverlay';
 import ButtonHintBar from './src/components/ButtonHintBar';
+import StatusOverlay from './src/components/StatusOverlay';
 import { Event, useTrackPlayerEvents } from 'react-native-track-player';
 
 function App(): React.JSX.Element {
@@ -55,9 +58,13 @@ function App(): React.JSX.Element {
       if (event.type === Event.PlaybackActiveTrackChanged && event.track) {
         const store = usePlayerStore.getState();
         if (store.isAlbumExperience) {
-          // Update queue index
+          // Update queue index and resolve the correct TrackRow for display
           const index = event.index ?? 0;
-          usePlayerStore.setState({ currentQueueIndex: index });
+          const matchedTrack = store.queueTracks[index];
+          usePlayerStore.setState({
+            currentQueueIndex: index,
+            ...(matchedTrack ? { currentTrack: matchedTrack } : {}),
+          });
         }
       }
     },
@@ -68,6 +75,13 @@ function App(): React.JSX.Element {
     (async () => {
       await setupPlayer();
 
+      // Request notification permission on Android 13+
+      try {
+        await NotificationPermission.requestPermission();
+      } catch (error) {
+        console.warn('Failed to request notification permission:', error);
+      }
+
       // Hydrate persisted settings (controller layout, seek amounts, etc.)
       hydrateSettings();
 
@@ -77,6 +91,8 @@ function App(): React.JSX.Element {
       if (lib) {
         // Run incremental scan
         setScanning(true, 'Scanning library...');
+        // Show native notification so Android keeps us alive in background
+        MetadataProgressNotification.show(0).catch(() => {});
         try {
           await scanLibrary(progress => {
             if (progress.phase === 'done') {
@@ -95,15 +111,16 @@ function App(): React.JSX.Element {
                 }
               });
             } else {
-              setScanning(
-                true,
-                `${progress.phase}: ${progress.currentName ?? ''} (${progress.current}/${progress.total})`,
-              );
+              const label = `${progress.phase}: ${progress.currentName ?? ''} (${progress.current}/${progress.total})`;
+              setScanning(true, label);
+              MetadataProgressNotification.update(progress.current, 0, label).catch(() => {});
             }
           });
         } catch (error) {
-          console.error('Scan error:', error);
+          console.error('Scan error during app initialization:', error);
+          console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
           setScanning(false);
+          MetadataProgressNotification.dismiss().catch(() => {});
         }
       }
 
@@ -123,6 +140,8 @@ function App(): React.JSX.Element {
     if (uri) {
       setHasLib(true);
       setScanning(true, 'Scanning library...');
+      // Show native notification so Android keeps us alive in background
+      MetadataProgressNotification.show(0).catch(() => {});
 
       try {
         await scanLibrary(progress => {
@@ -141,15 +160,16 @@ function App(): React.JSX.Element {
               }
             });
           } else {
-            setScanning(
-              true,
-              `${progress.phase}: ${progress.currentName ?? ''} (${progress.current}/${progress.total})`,
-            );
+            const label = `${progress.phase}: ${progress.currentName ?? ''} (${progress.current}/${progress.total})`;
+            setScanning(true, label);
+            MetadataProgressNotification.update(progress.current, 0, label).catch(() => {});
           }
         });
       } catch (error) {
-        console.error('Scan error:', error);
+        console.error('Scan error during folder pick:', error);
+        console.error('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
         setScanning(false);
+        MetadataProgressNotification.dismiss().catch(() => {});
       }
     }
   }, [refreshLibrary, setScanning, setMetadataProgress]);
@@ -178,6 +198,7 @@ function App(): React.JSX.Element {
       {currentScreen === 'library' && <LibraryScreen />}
       {currentScreen === 'folder' && <FolderScreen />}
       {currentScreen === 'settings' && <SettingsScreen />}
+      <StatusOverlay />
       <TrackInfoOverlay />
       <ButtonHintBar />
     </View>

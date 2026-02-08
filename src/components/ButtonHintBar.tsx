@@ -1,20 +1,26 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { usePlayerStore } from '../store/playerStore';
-import type { ControllerLayout, ScreenName } from '../store/playerStore';
+import type { ControllerLayout, ScreenName, StandardXAction } from '../store/playerStore';
 
 interface HintItem {
   button: string;
   action: string;
 }
 
-function getHints(screen: ScreenName, layout: ControllerLayout): HintItem[] {
+function getHints(screen: ScreenName, layout: ControllerLayout, xAction: StandardXAction): HintItem[] {
   switch (screen) {
     case 'nowplaying': {
+      const xLabel =
+        layout === 'sixbutton'
+          ? 'Favorite'
+          : xAction === 'favorite'
+            ? 'Favorite'
+            : 'Repeat';
       const base: HintItem[] = [
         { button: 'A', action: 'Play/Pause' },
         { button: 'B', action: 'Back' },
-        { button: 'X', action: 'Repeat' },
+        { button: 'X', action: xLabel },
         { button: 'Y', action: 'Track Info' },
         { button: 'L1', action: 'Prev' },
         { button: 'R1', action: 'Next' },
@@ -23,8 +29,8 @@ function getHints(screen: ScreenName, layout: ControllerLayout): HintItem[] {
       ];
       if (layout === 'sixbutton') {
         base.push(
-          { button: 'C', action: 'Shuffle' },
-          { button: 'Z', action: 'Restart' },
+          { button: 'C', action: 'Restart' },
+          { button: 'Z', action: 'Repeat' },
         );
       }
       return base;
@@ -33,9 +39,11 @@ function getHints(screen: ScreenName, layout: ControllerLayout): HintItem[] {
       const base: HintItem[] = [
         { button: 'A', action: 'Select' },
         { button: 'B', action: 'Back' },
+        { button: 'X', action: 'Favorite' },
         { button: 'Y', action: 'Track Info' },
         { button: 'L1', action: 'Page↑' },
         { button: 'R1', action: 'Page↓' },
+        { button: 'R2', action: 'Album Exp.' },
       ];
       if (layout === 'sixbutton') {
         base.push({ button: 'C', action: 'Track Info' });
@@ -46,10 +54,11 @@ function getHints(screen: ScreenName, layout: ControllerLayout): HintItem[] {
       const base: HintItem[] = [
         { button: 'A', action: 'Select' },
         { button: 'B', action: 'Back' },
-        { button: 'X', action: 'Continuous Play' },
+        { button: 'X', action: 'Favorite' },
         { button: 'Y', action: 'Track Info' },
         { button: 'L1', action: 'Page↑' },
         { button: 'R1', action: 'Page↓' },
+        { button: 'R2', action: 'Album Exp.' },
       ];
       if (layout === 'sixbutton') {
         base.push({ button: 'C', action: 'Track Info' });
@@ -70,10 +79,11 @@ export default function ButtonHintBar(): React.JSX.Element | null {
   const showButtonHints = usePlayerStore(s => s.showButtonHints);
   const currentScreen = usePlayerStore(s => s.currentScreen);
   const controllerLayout = usePlayerStore(s => s.controllerLayout);
+  const standardXAction = usePlayerStore(s => s.standardXAction);
 
   if (!showButtonHints) return null;
 
-  const hints = getHints(currentScreen, controllerLayout);
+  const hints = getHints(currentScreen, controllerLayout, standardXAction);
   if (hints.length === 0) return null;
 
   return (

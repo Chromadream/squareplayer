@@ -1,6 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { usePlayerStore } from '../store/playerStore';
+import { stripAudioExtension } from '../utils/audio';
 
 function formatDuration(seconds: number): string {
   if (!seconds || !isFinite(seconds)) return '—';
@@ -37,7 +38,7 @@ export default function TrackInfoOverlay(): React.JSX.Element | null {
   if (!inspectedTrack) return null;
 
   const title = inspectedTrack.title
-    ?? inspectedTrack.fileName.replace(/\.flac$/i, '');
+    ?? stripAudioExtension(inspectedTrack.fileName);
 
   return (
     <View style={styles.backdrop}>
@@ -66,6 +67,12 @@ export default function TrackInfoOverlay(): React.JSX.Element | null {
           <InfoRow
             label="Track #"
             value={inspectedTrack.trackNumber.toString()}
+          />
+        )}
+        {inspectedTrack.discNumber > 0 && (
+          <InfoRow
+            label="Disc #"
+            value={inspectedTrack.discNumber.toString()}
           />
         )}
         <InfoRow

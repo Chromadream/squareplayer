@@ -7,6 +7,8 @@ import com.facebook.react.ReactHost
 import com.facebook.react.ReactNativeApplicationEntryPoint.loadReactNative
 import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.squareplayer.metadata.MetadataExtractorPackage
+import com.squareplayer.notification.MetadataProgressPackage
+import com.squareplayer.focus.FocusHelperPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -17,6 +19,8 @@ class MainApplication : Application(), ReactApplication {
         PackageList(this).packages.apply {
           // Packages that cannot be autolinked yet can be added manually here, for example:
           add(MetadataExtractorPackage())
+          add(MetadataProgressPackage())
+          add(FocusHelperPackage())
         },
     )
   }

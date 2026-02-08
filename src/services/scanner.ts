@@ -10,8 +10,10 @@ import {
   deleteFoldersByUris,
   updateFolderTrackCount,
   updateFolderCoverArt,
+  updateFolderAlbumExperience,
   type FolderRow,
 } from './database';
+import { AUDIO_FILE_REGEX } from '../utils/audio';
 
 export interface ScanProgress {
   phase: 'folders' | 'tracks' | 'done';
@@ -23,8 +25,57 @@ export interface ScanProgress {
 type ProgressCallback = (progress: ScanProgress) => void;
 
 const COVER_ART_REGEX = /^cover\.(jpg|jpeg|png)$/i;
-const FLAC_REGEX = /\.flac$/i;
+const IMAGE_FILE_REGEX = /\.(jpg|jpeg|png)$/i;
 const DISC_FOLDER_REGEX = /^(disc|cd|disk)\s*\d+$/i;
+
+type FileEntry = { type: string; name: string; uri: string };
+
+/**
+ * Find cover art across a folder and its disc subfolders.
+ * Priority chain:
+ *   1. cover.jpg/jpeg/png in the folder
+ *   2. cover.jpg/jpeg/png in the first disc subfolder that has one
+ *   3. First JPEG/PNG in the folder
+ *   4. First JPEG/PNG in the first disc subfolder that has one
+ */
+function findCoverArt(
+  entries: FileEntry[],
+  discFolderEntries?: FileEntry[][],
+): FileEntry | undefined {
+  // 1. cover.* in the folder itself
+  const folderCover = entries.find(
+    e => e.type === 'file' && COVER_ART_REGEX.test(e.name),
+  );
+  if (folderCover) return folderCover;
+
+  // 2. cover.* in a disc subfolder
+  if (discFolderEntries) {
+    for (const discEntries of discFolderEntries) {
+      const discCover = discEntries.find(
+        e => e.type === 'file' && COVER_ART_REGEX.test(e.name),
+      );
+      if (discCover) return discCover;
+    }
+  }
+
+  // 3. First image file in the folder
+  const folderImage = entries.find(
+    e => e.type === 'file' && IMAGE_FILE_REGEX.test(e.name),
+  );
+  if (folderImage) return folderImage;
+
+  // 4. First image file in a disc subfolder
+  if (discFolderEntries) {
+    for (const discEntries of discFolderEntries) {
+      const discImage = discEntries.find(
+        e => e.type === 'file' && IMAGE_FILE_REGEX.test(e.name),
+      );
+      if (discImage) return discImage;
+    }
+  }
+
+  return undefined;
+}
 
 // Root folder virtual name
 const ROOT_FOLDER_NAME = '__root__';
@@ -55,10 +106,13 @@ export function getLibraryUri(): string | null {
 
 /**
  * Scan the library folder, performing incremental updates where possible.
- * Structure: root can contain .flac files and 1-level-deep subfolders.
+ * Structure: root can contain audio files (.flac, .mp3) and 1-level-deep subfolders.
+ * @param onProgress Optional callback to report scan progress
+ * @param fullRescan If true, forces all tracks to be rescanned even if unchanged
  */
 export async function scanLibrary(
   onProgress?: ProgressCallback,
+  fullRescan?: boolean,
 ): Promise<void> {
   const rootUri = getConfig('library_uri');
   if (!rootUri) {
@@ -71,12 +125,10 @@ export async function scanLibrary(
   const rootEntries = await listFiles(rootUri);
 
   // Separate into files and directories
-  const rootFlacFiles = rootEntries.filter(
-    e => e.type === 'file' && FLAC_REGEX.test(e.name),
+  const rootAudioFiles = rootEntries.filter(
+    e => e.type === 'file' && AUDIO_FILE_REGEX.test(e.name),
   );
-  const rootCoverArt = rootEntries.find(
-    e => e.type === 'file' && COVER_ART_REGEX.test(e.name),
-  );
+  const rootCoverArt = findCoverArt(rootEntries);
   const subDirectories = rootEntries.filter(e => e.type === 'directory');
 
   // Upsert root virtual folder
@@ -94,7 +146,7 @@ export async function scanLibrary(
   const folderScanResults: Array<{
     folderId: number;
     uri: string;
-    files: Array<{ uri: string; name: string; size: number; lastModified: number }>;
+    files: Array<{ uri: string; name: string; size: number; lastModified: number; discNumber: number }>;
     coverArtUri: string | null;
   }> = [];
 
@@ -111,40 +163,49 @@ export async function scanLibrary(
 
     // List files inside the subfolder
     const subEntries = await listFiles(dir.uri);
-    const subFlacFiles = subEntries.filter(
-      e => e.type === 'file' && FLAC_REGEX.test(e.name),
+    const subAudioFiles = subEntries.filter(
+      e => e.type === 'file' && AUDIO_FILE_REGEX.test(e.name),
     );
-    const subCoverArt = subEntries.find(
-      e => e.type === 'file' && COVER_ART_REGEX.test(e.name),
-    );
-
     // Check for disc subfolders (e.g. "Disc 1", "CD 2", "Disk 3")
     const discSubDirs = subEntries.filter(
       e => e.type === 'directory' && DISC_FOLDER_REGEX.test(e.name),
     );
 
-    // Collect all flac files: direct files + files from disc subfolders
-    let allFlacFiles = subFlacFiles.map(f => ({
+    // Collect all audio files: direct files + files from disc subfolders
+    let allAudioFiles = subAudioFiles.map(f => ({
       uri: f.uri,
       name: f.name,
       size: f.size ?? 0,
       lastModified: f.lastModified ?? 0,
+      discNumber: 0,
     }));
 
+    // Also collect disc folder entries for cover art lookup
+    const allDiscEntries: FileEntry[][] = [];
+
     for (const discDir of discSubDirs) {
+      // Extract disc number from folder name (e.g. "Disc 1" → 1, "CD 2" → 2)
+      const discMatch = discDir.name.match(/\d+/);
+      const folderDiscNumber = discMatch ? parseInt(discMatch[0], 10) : 0;
+
       const discEntries = await listFiles(discDir.uri);
-      const discFlacFiles = discEntries.filter(
-        e => e.type === 'file' && FLAC_REGEX.test(e.name),
+      allDiscEntries.push(discEntries);
+      const discAudioFiles = discEntries.filter(
+        e => e.type === 'file' && AUDIO_FILE_REGEX.test(e.name),
       );
-      allFlacFiles = allFlacFiles.concat(
-        discFlacFiles.map(f => ({
+      allAudioFiles = allAudioFiles.concat(
+        discAudioFiles.map(f => ({
           uri: f.uri,
           name: f.name,
           size: f.size ?? 0,
           lastModified: f.lastModified ?? 0,
+          discNumber: folderDiscNumber,
         })),
       );
     }
+
+    // Find cover art across folder and disc subfolders
+    const subCoverArt = findCoverArt(subEntries, allDiscEntries);
 
     const folderId = upsertFolder(
       dir.uri,
@@ -152,10 +213,16 @@ export async function scanLibrary(
       subCoverArt?.uri ?? null,
     );
 
+    // Sync Album Experience with .album marker file presence
+    const hasAlbumMarker = subEntries.some(
+      e => e.type === 'file' && e.name === '.album',
+    );
+    updateFolderAlbumExperience(folderId, hasAlbumMarker);
+
     folderScanResults.push({
       folderId,
       uri: dir.uri,
-      files: allFlacFiles,
+      files: allAudioFiles,
       coverArtUri: subCoverArt?.uri ?? null,
     });
   }
@@ -174,12 +241,14 @@ export async function scanLibrary(
 
   await syncTracksForFolder(
     rootFolderId,
-    rootFlacFiles.map(f => ({
+    rootAudioFiles.map(f => ({
       uri: f.uri,
       name: f.name,
       size: f.size ?? 0,
       lastModified: f.lastModified ?? 0,
+      discNumber: 0,
     })),
+    fullRescan,
   );
   updateFolderTrackCount(rootFolderId);
 
@@ -194,7 +263,7 @@ export async function scanLibrary(
       currentName: folder.uri,
     });
 
-    await syncTracksForFolder(folder.folderId, folder.files);
+    await syncTracksForFolder(folder.folderId, folder.files, fullRescan);
     updateFolderTrackCount(folder.folderId);
   }
 
@@ -205,6 +274,7 @@ export async function scanLibrary(
 /**
  * Sync tracks for a single folder: diff filesystem vs DB,
  * insert new, mark changed for rescan, delete removed.
+ * @param fullRescan If true, forces all tracks to be re-inserted even if unchanged
  */
 function syncTracksForFolder(
   folderId: number,
@@ -213,7 +283,9 @@ function syncTracksForFolder(
     name: string;
     size: number;
     lastModified: number;
+    discNumber: number;
   }>,
+  fullRescan?: boolean,
 ): void {
   const existingTracks = getTracksByFolder(folderId);
   const existingMap = new Map(existingTracks.map(t => [t.uri, t]));
@@ -231,18 +303,21 @@ function syncTracksForFolder(
         file.size,
         file.lastModified,
         folderId,
+        file.discNumber,
       );
     } else if (
+      fullRescan ||
       existing.lastModified !== file.lastModified ||
       existing.fileSize !== file.size
     ) {
-      // Changed file - re-insert triggers metadataParsed = 0
+      // Changed file or full rescan - re-insert triggers metadataParsed = 0
       upsertTrack(
         file.uri,
         file.name,
         file.size,
         file.lastModified,
         folderId,
+        file.discNumber,
       );
     }
     // else: unchanged, skip

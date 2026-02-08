@@ -1,12 +1,17 @@
 import { InteractionManager } from 'react-native';
 import MetadataExtractor from '../native/MetadataExtractor';
+import MetadataProgressNotification from '../native/MetadataProgress';
 import {
   getUnparsedTracks,
+  getUnparsedTrackCount,
   updateTrackMetadata,
   getFolderById,
   updateFolderCoverArt,
+  getConfig,
   type TrackRow,
 } from './database';
+import { encodeContentUri } from '../utils/uri';
+import { stripAudioExtension } from '../utils/audio';
 
 const BATCH_SIZE = 5;
 
@@ -19,16 +24,25 @@ export type MetadataProgress = {
 type MetadataProgressCallback = (progress: MetadataProgress) => void;
 
 let isRunning = false;
+let totalAtStart = 0;
+let parsedSoFar = 0;
 
 /**
  * Start background metadata parsing for all unparsed tracks.
  * Processes in batches with setTimeout yielding to keep UI responsive.
+ * Shows a native Android progress notification while running.
  */
 export function startMetadataParsing(
   onProgress?: MetadataProgressCallback,
 ): void {
   if (isRunning) return;
   isRunning = true;
+  parsedSoFar = 0;
+  totalAtStart = getUnparsedTrackCount();
+
+  if (totalAtStart > 0) {
+    MetadataProgressNotification.show(totalAtStart).catch(() => {});
+  }
 
   // Wait for any pending interactions (navigation animations, etc.)
   InteractionManager.runAfterInteractions(() => {
@@ -38,6 +52,7 @@ export function startMetadataParsing(
 
 export function stopMetadataParsing(): void {
   isRunning = false;
+  MetadataProgressNotification.dismiss().catch(() => {});
 }
 
 async function processNextBatch(
@@ -48,6 +63,7 @@ async function processNextBatch(
   const unparsed = getUnparsedTracks(BATCH_SIZE);
   if (unparsed.length === 0) {
     isRunning = false;
+    MetadataProgressNotification.dismiss().catch(() => {});
     onProgress?.({ total: 0, parsed: 0 });
     return;
   }
@@ -61,6 +77,15 @@ async function processNextBatch(
   );
 
   const parsed = results.filter(r => r.status === 'fulfilled').length;
+  parsedSoFar += parsed;
+
+  // Update native notification
+  MetadataProgressNotification.update(
+    parsedSoFar,
+    totalAtStart,
+    unparsed[0]?.fileName ?? null,
+  ).catch(() => {});
+
   onProgress?.({
     total: totalRemaining,
     parsed,
@@ -75,30 +100,53 @@ async function processNextBatch(
 
 async function extractAndSave(track: TrackRow): Promise<void> {
   try {
-    const metadata = await MetadataExtractor.extract(track.uri);
+    const treeRootUri = getConfig('library_uri');
+    const encodedTrackUri = encodeContentUri(track.uri, treeRootUri);
+    const metadata = await MetadataExtractor.extract(encodedTrackUri);
 
-    // Determine cover art: folder's cover.jpg/png has priority
+    // Determine cover art — priority chain:
+    //   1. Embedded art from the audio file
+    //   2. Folder cover art (cover.jpg → disc cover.jpg → first image → disc first image)
     let coverArtUri: string | null = null;
     const folder = getFolderById(track.folderId);
 
-    if (folder?.coverArtUri) {
-      // Folder has a cover.jpg/cover.png - use it
-      coverArtUri = folder.coverArtUri;
-    } else {
-      // Fallback: try to extract embedded cover art
-      try {
-        const embeddedArt = await MetadataExtractor.extractCoverArt(track.uri);
-        if (embeddedArt) {
-          coverArtUri = embeddedArt;
-          // Also update the folder's cover art so other tracks in the same folder benefit
-          if (folder && !folder.coverArtUri) {
-            updateFolderCoverArt(folder.id, embeddedArt);
-          }
+    // Priority 1: Embedded art
+    try {
+      const embeddedArt = await MetadataExtractor.extractCoverArt(encodedTrackUri);
+      if (embeddedArt) {
+        coverArtUri = embeddedArt;
+        // Also update the folder's cover art for folder-level display
+        if (folder && !folder.coverArtUri) {
+          updateFolderCoverArt(folder.id, embeddedArt);
         }
-      } catch {
-        // Cover art extraction failed, not critical
+      }
+    } catch {
+      // Cover art extraction failed, not critical
+    }
+
+    // Priority 2: Folder cover art (resolved during scanning)
+    if (!coverArtUri && folder?.coverArtUri) {
+      if (folder.coverArtUri.startsWith('file://')) {
+        // Already cached locally (from a previous track in this folder)
+        coverArtUri = folder.coverArtUri;
+      } else {
+        // SAF content:// URI — encode before passing to native ContentResolver
+        try {
+          const encodedCoverUri = encodeContentUri(folder.coverArtUri, treeRootUri);
+          const cachedPath = await MetadataExtractor.cacheSafFile(encodedCoverUri);
+          coverArtUri = cachedPath;
+          // Update folder so subsequent tracks skip the caching step
+          updateFolderCoverArt(folder.id, cachedPath);
+        } catch {
+          // Caching failed, continue without cover art
+          coverArtUri = null;
+        }
       }
     }
+
+    // Use metadata disc number, falling back to folder-name-derived disc number
+    // that was stored during scanning (e.g. from "Disc 2" subfolder)
+    const discNumber = metadata.discNumber > 0 ? metadata.discNumber : track.discNumber;
 
     updateTrackMetadata(
       track.uri,
@@ -108,6 +156,7 @@ async function extractAndSave(track: TrackRow): Promise<void> {
         albumArtist: metadata.albumArtist,
         album: metadata.album,
         trackNumber: metadata.trackNumber,
+        discNumber,
         duration: metadata.duration,
         bitrate: metadata.bitrate,
         sampleRate: metadata.sampleRate,
@@ -117,14 +166,17 @@ async function extractAndSave(track: TrackRow): Promise<void> {
     );
   } catch (error) {
     // If metadata extraction fails, still mark as parsed with filename as title
+    console.warn('Metadata extraction failed for:', track.uri, error);
+    console.warn('Stack trace:', error instanceof Error ? error.stack : 'No stack trace available');
     updateTrackMetadata(
       track.uri,
       {
-        title: track.fileName.replace(/\.flac$/i, ''),
+        title: stripAudioExtension(track.fileName),
         artist: null,
         albumArtist: null,
         album: null,
         trackNumber: 0,
+        discNumber: track.discNumber,  // preserve folder-derived disc number
         duration: 0,
         bitrate: 0,
         sampleRate: 0,

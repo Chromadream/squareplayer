@@ -63,20 +63,39 @@ function initializeSchema(database: DB): void {
   // Migration: add albumArtist column if it doesn't exist
   try {
     database.executeSync(`ALTER TABLE tracks ADD COLUMN albumArtist TEXT`);
-  } catch (_) {
+  } catch (e) {
     // Column already exists, ignore
+    console.debug('Migration: albumArtist column already exists or migration failed:', e);
+  }
+
+  // Migration: add discNumber column if it doesn't exist
+  try {
+    database.executeSync(`ALTER TABLE tracks ADD COLUMN discNumber INTEGER NOT NULL DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+    console.debug('Migration: discNumber column already exists or migration failed:', e);
   }
 
   // Migration: rename isDjSet → isAlbumExperience
   try {
     database.executeSync(`ALTER TABLE folders RENAME COLUMN isDjSet TO isAlbumExperience`);
-  } catch (_) {
+  } catch (e) {
     // Column already renamed or doesn't exist, ignore
+    console.debug('Migration: folders.isDjSet column already renamed or doesnt exist:', e);
   }
   try {
     database.executeSync(`ALTER TABLE tracks RENAME COLUMN isDjSet TO isAlbumExperience`);
-  } catch (_) {
+  } catch (e) {
     // Column already renamed or doesn't exist, ignore
+    console.debug('Migration: tracks.isDjSet column already renamed or doesnt exist:', e);
+  }
+
+  // Migration: add isFavorite column if it doesn't exist
+  try {
+    database.executeSync(`ALTER TABLE tracks ADD COLUMN isFavorite INTEGER NOT NULL DEFAULT 0`);
+  } catch (e) {
+    // Column already exists, ignore
+    console.debug('Migration: isFavorite column already exists or migration failed:', e);
   }
 }
 
@@ -182,6 +201,7 @@ export interface TrackRow {
   albumArtist: string | null;
   album: string | null;
   trackNumber: number;
+  discNumber: number;
   duration: number;
   bitrate: number;
   sampleRate: number;
@@ -190,6 +210,7 @@ export interface TrackRow {
   coverArtUri: string | null;
   folderId: number;
   isAlbumExperience: number;
+  isFavorite: number;
   lastModified: number;
   metadataParsed: number;
 }
@@ -200,17 +221,19 @@ export function upsertTrack(
   fileSize: number,
   lastModified: number,
   folderId: number,
+  discNumber: number = 0,
 ): void {
   getDatabase().executeSync(
-    `INSERT INTO tracks (uri, fileName, fileSize, lastModified, folderId, metadataParsed)
-     VALUES (?, ?, ?, ?, ?, 0)
+    `INSERT INTO tracks (uri, fileName, fileSize, lastModified, folderId, discNumber, metadataParsed)
+     VALUES (?, ?, ?, ?, ?, ?, 0)
      ON CONFLICT(uri) DO UPDATE SET
        fileName = excluded.fileName,
        fileSize = excluded.fileSize,
        lastModified = excluded.lastModified,
        folderId = excluded.folderId,
+       discNumber = excluded.discNumber,
        metadataParsed = 0`,
-    [uri, fileName, fileSize, lastModified, folderId],
+    [uri, fileName, fileSize, lastModified, folderId, discNumber],
   );
 }
 
@@ -222,6 +245,7 @@ export function updateTrackMetadata(
     albumArtist: string | null;
     album: string | null;
     trackNumber: number;
+    discNumber: number;
     duration: number;
     bitrate: number;
     sampleRate: number;
@@ -232,7 +256,7 @@ export function updateTrackMetadata(
   getDatabase().executeSync(
     `UPDATE tracks SET
        title = ?, artist = ?, albumArtist = ?, album = ?, trackNumber = ?,
-       duration = ?, bitrate = ?, sampleRate = ?, bitDepth = ?,
+       discNumber = ?, duration = ?, bitrate = ?, sampleRate = ?, bitDepth = ?,
        coverArtUri = ?, metadataParsed = 1
      WHERE uri = ?`,
     [
@@ -241,6 +265,7 @@ export function updateTrackMetadata(
       metadata.albumArtist,
       metadata.album,
       metadata.trackNumber,
+      metadata.discNumber,
       metadata.duration,
       metadata.bitrate,
       metadata.sampleRate,
@@ -253,7 +278,7 @@ export function updateTrackMetadata(
 
 export function getTracksByFolder(folderId: number): TrackRow[] {
   const result = getDatabase().executeSync(
-    'SELECT * FROM tracks WHERE folderId = ? ORDER BY trackNumber ASC, fileName COLLATE NOCASE ASC',
+    'SELECT * FROM tracks WHERE folderId = ? ORDER BY discNumber ASC, trackNumber ASC, fileName COLLATE NOCASE ASC',
     [folderId],
   );
   return (result.rows ?? []) as unknown as TrackRow[];
@@ -271,6 +296,14 @@ export function getUnparsedTracks(limit: number): TrackRow[] {
   return (result.rows ?? []) as unknown as TrackRow[];
 }
 
+export function getUnparsedTrackCount(): number {
+  const result = getDatabase().executeSync(
+    'SELECT COUNT(*) as cnt FROM tracks WHERE metadataParsed = 0',
+  );
+  const row = (result.rows ?? [])[0] as unknown as { cnt: number } | undefined;
+  return row?.cnt ?? 0;
+}
+
 export function getTrackByUri(uri: string): TrackRow | null {
   const result = getDatabase().executeSync('SELECT * FROM tracks WHERE uri = ?', [
     uri,
@@ -286,7 +319,7 @@ export function getTracksByFolderUri(folderUri: string): TrackRow[] {
     `SELECT t.* FROM tracks t
      JOIN folders f ON t.folderId = f.id
      WHERE f.uri = ?
-     ORDER BY t.trackNumber ASC, t.fileName COLLATE NOCASE ASC`,
+     ORDER BY t.discNumber ASC, t.trackNumber ASC, t.fileName COLLATE NOCASE ASC`,
     [folderUri],
   );
   return (result.rows ?? []) as unknown as TrackRow[];
@@ -339,6 +372,22 @@ export function getFolderById(id: number): FolderRow | null {
     return result.rows[0] as unknown as FolderRow;
   }
   return null;
+}
+
+export function toggleFavorite(trackId: number): boolean {
+  const db = getDatabase();
+  const result = db.executeSync('SELECT isFavorite FROM tracks WHERE id = ?', [trackId]);
+  const current = (result.rows?.[0] as unknown as { isFavorite: number })?.isFavorite ?? 0;
+  const newValue = current === 1 ? 0 : 1;
+  db.executeSync('UPDATE tracks SET isFavorite = ? WHERE id = ?', [newValue, trackId]);
+  return newValue === 1;
+}
+
+export function getFavoriteTracks(): TrackRow[] {
+  const result = getDatabase().executeSync(
+    'SELECT * FROM tracks WHERE isFavorite = 1 ORDER BY rowid DESC',
+  );
+  return (result.rows ?? []) as unknown as TrackRow[];
 }
 
 export function clearAllData(): void {

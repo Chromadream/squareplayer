@@ -1,16 +1,24 @@
-import React, { useCallback, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Pressable,
   type PressableProps,
   type StyleProp,
+  type View,
   type ViewStyle,
 } from 'react-native';
 import { usePlayerStore } from '../store/playerStore';
+import { requestNativeFocus } from '../native/FocusHelper';
+import NowPlayingGlow from './NowPlayingGlow';
 
 interface FocusablePressableProps extends Omit<PressableProps, 'style'> {
   style?: StyleProp<ViewStyle>;
   focusedStyle?: StyleProp<ViewStyle>;
   focusData?: any;
+  onPress?: () => void;
+  /** When true, programmatically requests focus after mount (for gamepad nav). */
+  autoFocus?: boolean;
+  /** When true, renders an animated iridescent glow to indicate the now-playing item. */
+  isNowPlaying?: boolean;
   children: React.ReactNode;
 }
 
@@ -25,10 +33,25 @@ export default function FocusablePressable({
   focusData,
   onFocus,
   onBlur,
+  onPress,
+  autoFocus,
+  isNowPlaying,
   children,
   ...rest
 }: FocusablePressableProps): React.JSX.Element {
   const [isFocused, setIsFocused] = useState(false);
+  const pressableRef = useRef<View>(null);
+
+  // Programmatically grab focus when autoFocus is set (e.g. first list item)
+  useEffect(() => {
+    if (autoFocus && pressableRef.current) {
+      // Short delay lets the FlatList finish layout before requesting focus
+      const timer = setTimeout(() => {
+        requestNativeFocus(pressableRef);
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocus]);
 
   const handleFocus = useCallback(
     (e: any) => {
@@ -36,9 +59,13 @@ export default function FocusablePressable({
       if (focusData !== undefined) {
         usePlayerStore.getState().setFocusedItem(focusData);
       }
+      // For settings screen: register the onPress handler
+      if (onPress) {
+        usePlayerStore.getState().setFocusedSettingAction(onPress);
+      }
       onFocus?.(e);
     },
-    [onFocus, focusData],
+    [onFocus, focusData, onPress],
   );
 
   const handleBlur = useCallback(
@@ -53,11 +80,14 @@ export default function FocusablePressable({
 
   return (
     <Pressable
+      ref={pressableRef}
       style={[style, isFocused && focusedStyle]}
       onFocus={handleFocus}
       onBlur={handleBlur}
+      onPress={onPress}
       {...rest}
     >
+      {isNowPlaying && <NowPlayingGlow />}
       {children}
     </Pressable>
   );

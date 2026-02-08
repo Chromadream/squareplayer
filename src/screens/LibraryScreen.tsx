@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -9,6 +9,7 @@ import {
 import { usePlayerStore } from '../store/playerStore';
 import { type FolderRow, type TrackRow } from '../services/database';
 import FocusablePressable from '../components/FocusablePressable';
+import { stripAudioExtension } from '../utils/audio';
 
 type LibraryItem =
   | { type: 'folder'; data: FolderRow }
@@ -18,6 +19,7 @@ export default function LibraryScreen(): React.JSX.Element {
   const {
     folders,
     rootTracks,
+    favoriteTracks,
     isScanning,
     scanProgress,
     metadataProgress,
@@ -26,15 +28,57 @@ export default function LibraryScreen(): React.JSX.Element {
     pendingScrollAction,
     clearPageScroll,
   } = usePlayerStore();
+  const currentTrack = usePlayerStore(s => s.currentTrack);
 
   const flatListRef = useRef<FlatList>(null);
   const [scrollIndex, setScrollIndex] = useState(0);
 
-  // Build combined list: folders first (alphabetical), then root tracks (alphabetical)
+  // Build combined list: favorites folder first, then real folders, then root tracks
+  const favoritesFolderItem: LibraryItem = {
+    type: 'folder' as const,
+    data: {
+      id: -1,
+      uri: '__favorites__',
+      name: 'Favorites',
+      isAlbumExperience: 0,
+      coverArtUri: null,
+      trackCount: favoriteTracks.length,
+    },
+  };
+
   const items: LibraryItem[] = [
+    favoritesFolderItem,
     ...folders.map(f => ({ type: 'folder' as const, data: f })),
     ...rootTracks.map(t => ({ type: 'track' as const, data: t })),
   ];
+
+  // Index of the now-playing item (folder containing track, or root track)
+  const nowPlayingIndex = useMemo(() => {
+    if (!currentTrack) return -1;
+    const idx = items.findIndex(item => {
+      if (item.type === 'folder') return item.data.id === currentTrack.folderId;
+      return item.data.id === currentTrack.id;
+    });
+    return idx;
+  }, [currentTrack, items]);
+
+  // The item that should receive autoFocus: now-playing item if any, otherwise first
+  const autoFocusIndex = nowPlayingIndex >= 0 ? nowPlayingIndex : 0;
+
+  // Scroll to the now-playing item when the screen mounts / items change
+  useEffect(() => {
+    if (autoFocusIndex > 0 && items.length > 0) {
+      // Small delay to let FlatList finish layout
+      const timer = setTimeout(() => {
+        flatListRef.current?.scrollToIndex({
+          index: autoFocusIndex,
+          animated: false,
+          viewPosition: 0.3,
+        });
+      }, 50);
+      return () => clearTimeout(timer);
+    }
+  }, [autoFocusIndex, items.length]);
 
   // Page scroll via store action (L1/R1)
   useEffect(() => {
@@ -52,12 +96,14 @@ export default function LibraryScreen(): React.JSX.Element {
   }, [pendingScrollAction, items.length, scrollIndex, clearPageScroll]);
 
   const renderItem = useCallback(
-    ({ item }: { item: LibraryItem }) => {
+    ({ item, index }: { item: LibraryItem; index: number }) => {
       if (item.type === 'folder') {
         return (
           <FolderItem
             folder={item.data}
             onPress={() => openFolder(item.data)}
+            autoFocus={index === autoFocusIndex}
+            isNowPlaying={currentTrack?.folderId === item.data.id}
           />
         );
       }
@@ -65,10 +111,12 @@ export default function LibraryScreen(): React.JSX.Element {
         <TrackItem
           track={item.data}
           onPress={() => playTrack(item.data)}
+          autoFocus={index === autoFocusIndex}
+          isNowPlaying={currentTrack?.id === item.data.id}
         />
       );
     },
-    [openFolder, playTrack],
+    [openFolder, playTrack, currentTrack, autoFocusIndex],
   );
 
   const keyExtractor = useCallback(
@@ -76,6 +124,16 @@ export default function LibraryScreen(): React.JSX.Element {
       item.type === 'folder'
         ? `folder-${item.data.id}`
         : `track-${item.data.id}`,
+    [],
+  );
+
+  const onScrollToIndexFailed = useCallback(
+    (info: { index: number; highestMeasuredFrameIndex: number; averageItemLength: number }) => {
+      flatListRef.current?.scrollToOffset({ offset: info.averageItemLength * info.index, animated: false });
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ index: info.index, animated: false, viewPosition: 0.3 });
+      }, 100);
+    },
     [],
   );
 
@@ -110,6 +168,7 @@ export default function LibraryScreen(): React.JSX.Element {
           keyExtractor={keyExtractor}
           contentContainerStyle={styles.listContent}
           initialNumToRender={20}
+          onScrollToIndexFailed={onScrollToIndexFailed}
         />
       )}
     </View>
@@ -119,12 +178,17 @@ export default function LibraryScreen(): React.JSX.Element {
 function FolderItem({
   folder,
   onPress,
+  autoFocus,
+  isNowPlaying,
 }: {
   folder: FolderRow;
   onPress: () => void;
+  autoFocus?: boolean;
+  isNowPlaying?: boolean;
 }): React.JSX.Element {
   const isAlbumExperience = folder.isAlbumExperience === 1;
-  const icon = isAlbumExperience ? '💿' : '📁';
+  const isFavorites = folder.id === -1 && folder.name === 'Favorites';
+  const icon = isFavorites ? '⭐' : isAlbumExperience ? '💿' : '📁';
 
   return (
     <FocusablePressable
@@ -132,6 +196,8 @@ function FolderItem({
       style={styles.item}
       focusedStyle={styles.itemFocused}
       focusData={folder}
+      autoFocus={autoFocus}
+      isNowPlaying={isNowPlaying}
     >
       <Text style={styles.itemIcon}>{icon}</Text>
       <View style={styles.itemContent}>
@@ -140,7 +206,7 @@ function FolderItem({
         </Text>
         <Text style={styles.itemSubtitle}>
           {folder.trackCount} track{folder.trackCount !== 1 ? 's' : ''}
-          {isAlbumExperience ? ' · Album Experience' : ''}
+          {!isFavorites && isAlbumExperience ? ' · Album Experience' : ''}
         </Text>
       </View>
       <Text style={styles.chevron}>›</Text>
@@ -151,11 +217,15 @@ function FolderItem({
 function TrackItem({
   track,
   onPress,
+  autoFocus,
+  isNowPlaying,
 }: {
   track: TrackRow;
   onPress: () => void;
+  autoFocus?: boolean;
+  isNowPlaying?: boolean;
 }): React.JSX.Element {
-  const title = track.title ?? track.fileName.replace(/\.flac$/i, '');
+  const title = track.title ?? stripAudioExtension(track.fileName);
   const subtitle = track.artist ?? '';
 
   return (
@@ -164,6 +234,8 @@ function TrackItem({
       style={styles.item}
       focusedStyle={styles.itemFocused}
       focusData={track}
+      autoFocus={autoFocus}
+      isNowPlaying={isNowPlaying}
     >
       <Text style={styles.itemIcon}>🎵</Text>
       <View style={styles.itemContent}>
@@ -176,6 +248,9 @@ function TrackItem({
           </Text>
         ) : null}
       </View>
+      {track.isFavorite === 1 && (
+        <Text style={styles.favoriteIcon}>⭐</Text>
+      )}
     </FocusablePressable>
   );
 }
@@ -261,6 +336,10 @@ const styles = StyleSheet.create({
   chevron: {
     color: '#555',
     fontSize: 22,
+    marginLeft: 8,
+  },
+  favoriteIcon: {
+    fontSize: 14,
     marginLeft: 8,
   },
 });

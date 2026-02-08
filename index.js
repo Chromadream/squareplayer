@@ -16,4 +16,5 @@ try {
   TrackPlayer.registerPlaybackService(() => PlaybackService);
 } catch (e) {
   console.warn('TrackPlayer registration deferred due to error:', e);
+  console.warn('Error details:', e instanceof Error ? { message: e.message, stack: e.stack } : String(e));
 }
