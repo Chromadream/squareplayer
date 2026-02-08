@@ -10,6 +10,7 @@ import {
 import { useProgress, useActiveTrack } from 'react-native-track-player';
 import { usePlayerStore } from '../store/playerStore';
 import { stripAudioExtension, getFormatLabel } from '../utils/audio';
+import { useThemedStyles } from '../theme/ThemeProvider';
 
 function formatTime(seconds: number): string {
   if (!seconds || !isFinite(seconds)) return '0:00';
@@ -22,19 +23,17 @@ function formatBitrate(track: ReturnType<typeof usePlayerStore.getState>['curren
   if (!track) return '';
   const parts: string[] = [];
 
-  if (track.bitrate > 0) {
-    parts.push(`${track.bitrate} kbps`);
-  }
-
-  if (track.sampleRate > 0) {
+  if (track.sampleRate > 0 && track.bitDepth > 0) {
     const sr = track.sampleRate >= 1000
       ? `${(track.sampleRate / 1000).toFixed(1)} kHz`
       : `${track.sampleRate} Hz`;
-    parts.push(sr);
+    const bdsr = `${track.bitDepth}-bit/${sr}`;
+    parts.push(bdsr);
   }
 
-  if (track.bitDepth > 0) {
-    parts.push(`${track.bitDepth}-bit`);
+
+  if (track.bitrate > 0) {
+    parts.push(`${track.bitrate} kbps`);
   }
 
   return parts.join(' · ');
@@ -44,6 +43,7 @@ export default function NowPlayingScreen(): React.JSX.Element {
   const progress = useProgress(200);
   const activeTrack = useActiveTrack();
   const { currentTrack, isAlbumExperience, queueLength, currentQueueIndex } = usePlayerStore();
+  const styles = useThemedStyles(createStyles);
 
   const [containerLayout, setContainerLayout] = useState({ width: 0, height: 0 });
   const [imageNaturalSize, setImageNaturalSize] = useState({ width: 0, height: 0 });
@@ -180,10 +180,10 @@ export default function NowPlayingScreen(): React.JSX.Element {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: import('../theme/colors').ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    backgroundColor: c.npBackground,
   },
   blurredBackground: {
     position: 'absolute',
@@ -203,20 +203,20 @@ const styles = StyleSheet.create({
   noArtwork: {
     width: '100%',
     height: '100%',
-    backgroundColor: '#1a1a2e',
+    backgroundColor: c.npNoArtworkBg,
     justifyContent: 'center',
     alignItems: 'center',
   },
   noArtworkText: {
     fontSize: 120,
-    color: '#333',
+    color: c.npNoArtworkText,
   },
   infoOverlayAnchor: {
     position: 'absolute',
     alignItems: 'flex-start',
   },
   infoOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: c.npOverlay,
     borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
@@ -224,34 +224,34 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   title: {
-    color: '#fff',
+    color: c.npTextPrimary,
     fontSize: 24,
     fontWeight: '600',
     textAlign: 'left',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowColor: c.npTextShadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   artistText: {
-    color: 'rgba(255,255,255,0.8)',
+    color: c.npTextSecondary,
     fontSize: 16,
     textAlign: 'left',
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowColor: c.npTextShadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   bitrateText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: c.npTextInfo,
     fontSize: 14,
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowColor: c.npTextShadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },
   timeText: {
-    color: 'rgba(255,255,255,0.9)',
+    color: c.npTextInfo,
     fontSize: 16,
     fontVariant: ['tabular-nums'],
-    textShadowColor: 'rgba(0, 0, 0, 0.75)',
+    textShadowColor: c.npTextShadow,
     textShadowOffset: { width: 0, height: 1 },
     textShadowRadius: 3,
   },

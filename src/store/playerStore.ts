@@ -21,6 +21,7 @@ const ROOT_FOLDER_NAME = '__root__';
 export type ControllerLayout = 'standard' | 'sixbutton';
 export type StandardXAction = 'favorite' | 'repeat';
 export type ScreenName = 'library' | 'folder' | 'nowplaying' | 'settings';
+export type ThemeMode = 'system' | 'dark' | 'light';
 
 export interface PlayerState {
   // Library
@@ -51,6 +52,7 @@ export interface PlayerState {
   seekAmount: number;
   largeSeekAmount: number;
   showButtonHints: boolean;
+  themeMode: ThemeMode;
 
   // UI state
   pendingScrollAction: 'pageUp' | 'pageDown' | null;
@@ -80,6 +82,7 @@ export interface PlayerState {
   setSeekAmount: (amount: number) => void;
   setLargeSeekAmount: (amount: number) => void;
   setShowButtonHints: (show: boolean) => void;
+  setThemeMode: (mode: ThemeMode) => void;
 
   // UI actions
   requestPageScroll: (direction: 'pageUp' | 'pageDown') => void;
@@ -121,6 +124,7 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
   seekAmount: 10,
   largeSeekAmount: 30,
   showButtonHints: false,
+  themeMode: 'system' as ThemeMode,
 
   // UI state
   pendingScrollAction: null,
@@ -353,6 +357,10 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     set({ showButtonHints: show });
     setConfig('show_button_hints', show ? '1' : '0');
   },
+  setThemeMode: (mode) => {
+    set({ themeMode: mode });
+    setConfig('theme_mode', mode);
+  },
 
   // UI actions
   requestPageScroll: (direction) => set({ pendingScrollAction: direction }),
@@ -371,12 +379,14 @@ export const usePlayerStore = create<PlayerState>((set, get) => ({
     const seek = getConfig('seek_amount');
     const largeSeek = getConfig('large_seek_amount');
     const hints = getConfig('show_button_hints');
+    const theme = getConfig('theme_mode');
     set({
       controllerLayout: (layout === 'sixbutton' ? 'sixbutton' : 'standard') as ControllerLayout,
       standardXAction: (xAction === 'repeat' ? 'repeat' : 'favorite') as StandardXAction,
       seekAmount: seek ? parseInt(seek, 10) || 10 : 10,
       largeSeekAmount: largeSeek ? parseInt(largeSeek, 10) || 30 : 30,
       showButtonHints: hints === '1',
+      themeMode: (theme === 'dark' || theme === 'light' ? theme : 'system') as ThemeMode,
     });
   },
 }));

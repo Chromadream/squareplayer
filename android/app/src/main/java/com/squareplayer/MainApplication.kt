@@ -9,6 +9,7 @@ import com.facebook.react.defaults.DefaultReactHost.getDefaultReactHost
 import com.squareplayer.metadata.MetadataExtractorPackage
 import com.squareplayer.notification.MetadataProgressPackage
 import com.squareplayer.focus.FocusHelperPackage
+import com.squareplayer.materialyou.MaterialYouPackage
 
 class MainApplication : Application(), ReactApplication {
 
@@ -21,6 +22,7 @@ class MainApplication : Application(), ReactApplication {
           add(MetadataExtractorPackage())
           add(MetadataProgressPackage())
           add(FocusHelperPackage())
+          add(MaterialYouPackage())
         },
     )
   }

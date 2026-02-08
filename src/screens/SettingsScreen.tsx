@@ -7,8 +7,10 @@ import {
   Alert,
 } from 'react-native';
 import { usePlayerStore } from '../store/playerStore';
-import type { ControllerLayout, StandardXAction } from '../store/playerStore';
+import type { ControllerLayout, StandardXAction, ThemeMode } from '../store/playerStore';
 import FocusablePressable from '../components/FocusablePressable';
+import { useThemedStyles } from '../theme/ThemeProvider';
+import type { ThemeColors } from '../theme/colors';
 import { scanLibrary } from '../services/scanner';
 import { startMetadataParsing } from '../services/metadataParser';
 import MetadataProgressNotification from '../native/MetadataProgress';
@@ -19,122 +21,122 @@ const LARGE_SEEK_OPTIONS = [15, 30, 60];
 
 // ─── Controller Diagram Components ──────────────────────────
 
-function ShoulderButtons({ largeSeek }: { largeSeek: number }): React.JSX.Element {
+function ShoulderButtons({ largeSeek, ds }: { largeSeek: number; ds: ReturnType<typeof createDiagramStyles> }): React.JSX.Element {
   return (
-    <View style={diagramStyles.shoulderRow}>
-      <View style={diagramStyles.shoulderGroup}>
-        <View style={diagramStyles.triggerButton}>
-          <Text style={diagramStyles.triggerLabel}>L2</Text>
+    <View style={ds.shoulderRow}>
+      <View style={ds.shoulderGroup}>
+        <View style={ds.triggerButton}>
+          <Text style={ds.triggerLabel}>L2</Text>
         </View>
-        <View style={diagramStyles.shoulderButton}>
-          <Text style={diagramStyles.shoulderLabel}>L1</Text>
+        <View style={ds.shoulderButton}>
+          <Text style={ds.shoulderLabel}>L1</Text>
         </View>
-        <Text style={diagramStyles.shoulderAction}>Prev Track</Text>
+        <Text style={ds.shoulderAction}>Prev Track</Text>
       </View>
-      <View style={diagramStyles.shoulderGroup}>
-        <Text style={diagramStyles.shoulderAction}>Next Track</Text>
-        <View style={diagramStyles.shoulderButton}>
-          <Text style={diagramStyles.shoulderLabel}>R1</Text>
+      <View style={ds.shoulderGroup}>
+        <Text style={ds.shoulderAction}>Next Track</Text>
+        <View style={ds.shoulderButton}>
+          <Text style={ds.shoulderLabel}>R1</Text>
         </View>
-        <View style={diagramStyles.triggerButton}>
-          <Text style={diagramStyles.triggerLabel}>R2</Text>
+        <View style={ds.triggerButton}>
+          <Text style={ds.triggerLabel}>R2</Text>
         </View>
       </View>
     </View>
   );
 }
 
-function TriggerLabels({ largeSeek }: { largeSeek: number }): React.JSX.Element {
+function TriggerLabels({ largeSeek, ds }: { largeSeek: number; ds: ReturnType<typeof createDiagramStyles> }): React.JSX.Element {
   return (
-    <View style={diagramStyles.triggerLabelRow}>
-      <Text style={diagramStyles.triggerActionText}>Seek −{largeSeek}s</Text>
-      <Text style={diagramStyles.triggerActionText}>Seek +{largeSeek}s</Text>
+    <View style={ds.triggerLabelRow}>
+      <Text style={ds.triggerActionText}>Seek −{largeSeek}s</Text>
+      <Text style={ds.triggerActionText}>Seek +{largeSeek}s</Text>
     </View>
   );
 }
 
 /** SNES-style diamond: X top, Y left, A right, B bottom */
-function SNESDiagram({ xAction }: { xAction: StandardXAction }): React.JSX.Element {
+function SNESDiagram({ xAction, ds, colors }: { xAction: StandardXAction; ds: ReturnType<typeof createDiagramStyles>; colors: ThemeColors }): React.JSX.Element {
   return (
-    <View style={diagramStyles.faceContainer}>
+    <View style={ds.faceContainer}>
       {/* Top: X */}
-      <View style={diagramStyles.diamondRow}>
-        <View style={diagramStyles.diamondActionLeft} />
-        <View style={[diagramStyles.faceButton, { backgroundColor: '#4a7ccc' }]}>
-          <Text style={diagramStyles.faceLabel}>X</Text>
+      <View style={ds.diamondRow}>
+        <View style={ds.diamondActionLeft} />
+        <View style={[ds.faceButton, { backgroundColor: colors.diagramButton1 }]}>
+          <Text style={ds.faceLabel}>X</Text>
         </View>
-        <Text style={diagramStyles.diamondActionRight}>
+        <Text style={ds.diamondActionRight}>
           {xAction === 'favorite' ? 'Favorite' : 'Repeat'}
         </Text>
       </View>
       {/* Middle: Y left, A right */}
-      <View style={diagramStyles.diamondMiddle}>
-        <Text style={diagramStyles.diamondActionFarLeft}>Track Info</Text>
-        <View style={[diagramStyles.faceButton, { backgroundColor: '#5aa655' }]}>
-          <Text style={diagramStyles.faceLabel}>Y</Text>
+      <View style={ds.diamondMiddle}>
+        <Text style={ds.diamondActionFarLeft}>Track Info</Text>
+        <View style={[ds.faceButton, { backgroundColor: colors.diagramButton2 }]}>
+          <Text style={ds.faceLabel}>Y</Text>
         </View>
-        <View style={diagramStyles.diamondCenter} />
-        <View style={[diagramStyles.faceButton, { backgroundColor: '#cc4a4a' }]}>
-          <Text style={diagramStyles.faceLabel}>A</Text>
+        <View style={ds.diamondCenter} />
+        <View style={[ds.faceButton, { backgroundColor: colors.diagramButton3 }]}>
+          <Text style={ds.faceLabel}>A</Text>
         </View>
-        <Text style={diagramStyles.diamondActionFarRight}>Play/Pause</Text>
+        <Text style={ds.diamondActionFarRight}>Play/Pause</Text>
       </View>
       {/* Bottom: B */}
-      <View style={diagramStyles.diamondRow}>
-        <View style={diagramStyles.diamondActionLeft} />
-        <View style={[diagramStyles.faceButton, { backgroundColor: '#ccb044' }]}>
-          <Text style={diagramStyles.faceLabel}>B</Text>
+      <View style={ds.diamondRow}>
+        <View style={ds.diamondActionLeft} />
+        <View style={[ds.faceButton, { backgroundColor: colors.diagramButton4 }]}>
+          <Text style={ds.faceLabel}>B</Text>
         </View>
-        <Text style={diagramStyles.diamondActionRight}>Back</Text>
+        <Text style={ds.diamondActionRight}>Back</Text>
       </View>
     </View>
   );
 }
 
 /** Sega Saturn-style 2×3 grid: top row X Y Z, bottom row A B C */
-function SaturnDiagram(): React.JSX.Element {
+function SaturnDiagram({ ds, colors }: { ds: ReturnType<typeof createDiagramStyles>; colors: ThemeColors }): React.JSX.Element {
   return (
-    <View style={diagramStyles.faceContainer}>
+    <View style={ds.faceContainer}>
       {/* Top row: X Y Z */}
-      <View style={diagramStyles.saturnRow}>
-        <View style={diagramStyles.saturnButtonGroup}>
-          <View style={[diagramStyles.saturnButton, { backgroundColor: '#4a7ccc' }]}>
-            <Text style={diagramStyles.faceLabel}>X</Text>
+      <View style={ds.saturnRow}>
+        <View style={ds.saturnButtonGroup}>
+          <View style={[ds.saturnButton, { backgroundColor: colors.diagramButton1 }]}>
+            <Text style={ds.faceLabel}>X</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Favorite</Text>
+          <Text style={ds.saturnAction}>Favorite</Text>
         </View>
-        <View style={diagramStyles.saturnButtonGroup}>
-          <View style={[diagramStyles.saturnButton, { backgroundColor: '#5aa655' }]}>
-            <Text style={diagramStyles.faceLabel}>Y</Text>
+        <View style={ds.saturnButtonGroup}>
+          <View style={[ds.saturnButton, { backgroundColor: colors.diagramButton2 }]}>
+            <Text style={ds.faceLabel}>Y</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Track Info</Text>
+          <Text style={ds.saturnAction}>Track Info</Text>
         </View>
-        <View style={diagramStyles.saturnButtonGroup}>
-          <View style={[diagramStyles.saturnButton, { backgroundColor: '#8855aa' }]}>
-            <Text style={diagramStyles.faceLabel}>Z</Text>
+        <View style={ds.saturnButtonGroup}>
+          <View style={[ds.saturnButton, { backgroundColor: colors.diagramButton5 }]}>
+            <Text style={ds.faceLabel}>Z</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Repeat</Text>
+          <Text style={ds.saturnAction}>Repeat</Text>
         </View>
       </View>
       {/* Bottom row: A B C */}
-      <View style={diagramStyles.saturnRow}>
-        <View style={diagramStyles.saturnButtonGroup}>
-          <View style={[diagramStyles.saturnButton, { backgroundColor: '#cc4a4a' }]}>
-            <Text style={diagramStyles.faceLabel}>A</Text>
+      <View style={ds.saturnRow}>
+        <View style={ds.saturnButtonGroup}>
+          <View style={[ds.saturnButton, { backgroundColor: colors.diagramButton3 }]}>
+            <Text style={ds.faceLabel}>A</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Play/Pause</Text>
+          <Text style={ds.saturnAction}>Play/Pause</Text>
         </View>
-        <View style={diagramStyles.saturnButtonGroup}>
-          <View style={[diagramStyles.saturnButton, { backgroundColor: '#ccb044' }]}>
-            <Text style={diagramStyles.faceLabel}>B</Text>
+        <View style={ds.saturnButtonGroup}>
+          <View style={[ds.saturnButton, { backgroundColor: colors.diagramButton4 }]}>
+            <Text style={ds.faceLabel}>B</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Back</Text>
+          <Text style={ds.saturnAction}>Back</Text>
         </View>
-        <View style={diagramStyles.saturnButtonGroup}>
-          <View style={[diagramStyles.saturnButton, { backgroundColor: '#cc7a33' }]}>
-            <Text style={diagramStyles.faceLabel}>C</Text>
+        <View style={ds.saturnButtonGroup}>
+          <View style={[ds.saturnButton, { backgroundColor: colors.diagramButton6 }]}>
+            <Text style={ds.faceLabel}>C</Text>
           </View>
-          <Text style={diagramStyles.saturnAction}>Restart</Text>
+          <Text style={ds.saturnAction}>Restart</Text>
         </View>
       </View>
     </View>
@@ -145,62 +147,66 @@ function ControllerDiagram({
   layout,
   largeSeek,
   xAction,
+  ds,
+  colors,
 }: {
   layout: ControllerLayout;
   largeSeek: number;
   xAction: StandardXAction;
+  ds: ReturnType<typeof createDiagramStyles>;
+  colors: ThemeColors;
 }): React.JSX.Element {
   return (
-    <View style={diagramStyles.container}>
-      <Text style={diagramStyles.title}>
+    <View style={ds.container}>
+      <Text style={ds.title}>
         {layout === 'standard' ? 'SNES Layout' : 'Saturn Layout'} — Now Playing Controls
       </Text>
-      <TriggerLabels largeSeek={largeSeek} />
-      <ShoulderButtons largeSeek={largeSeek} />
-      <View style={diagramStyles.bodyArea}>
+      <TriggerLabels largeSeek={largeSeek} ds={ds} />
+      <ShoulderButtons largeSeek={largeSeek} ds={ds} />
+      <View style={ds.bodyArea}>
         {/* D-pad on left */}
-        <View style={diagramStyles.dpadContainer}>
-          <View style={diagramStyles.dpadRow}>
-            <View style={diagramStyles.dpadEmpty} />
-            <View style={diagramStyles.dpadButton}>
-              <Text style={diagramStyles.dpadLabel}>▲</Text>
+        <View style={ds.dpadContainer}>
+          <View style={ds.dpadRow}>
+            <View style={ds.dpadEmpty} />
+            <View style={ds.dpadButton}>
+              <Text style={ds.dpadLabel}>▲</Text>
             </View>
-            <View style={diagramStyles.dpadEmpty} />
+            <View style={ds.dpadEmpty} />
           </View>
-          <View style={diagramStyles.dpadRow}>
-            <View style={diagramStyles.dpadButton}>
-              <Text style={diagramStyles.dpadLabel}>◄</Text>
+          <View style={ds.dpadRow}>
+            <View style={ds.dpadButton}>
+              <Text style={ds.dpadLabel}>◄</Text>
             </View>
-            <View style={diagramStyles.dpadCenter} />
-            <View style={diagramStyles.dpadButton}>
-              <Text style={diagramStyles.dpadLabel}>►</Text>
+            <View style={ds.dpadCenter} />
+            <View style={ds.dpadButton}>
+              <Text style={ds.dpadLabel}>►</Text>
             </View>
           </View>
-          <View style={diagramStyles.dpadRow}>
-            <View style={diagramStyles.dpadEmpty} />
-            <View style={diagramStyles.dpadButton}>
-              <Text style={diagramStyles.dpadLabel}>▼</Text>
+          <View style={ds.dpadRow}>
+            <View style={ds.dpadEmpty} />
+            <View style={ds.dpadButton}>
+              <Text style={ds.dpadLabel}>▼</Text>
             </View>
-            <View style={diagramStyles.dpadEmpty} />
+            <View style={ds.dpadEmpty} />
           </View>
-          <Text style={diagramStyles.dpadAction}>Seek / Skip</Text>
+          <Text style={ds.dpadAction}>Seek / Skip</Text>
         </View>
         {/* Face buttons on right */}
-        {layout === 'standard' ? <SNESDiagram xAction={xAction} /> : <SaturnDiagram />}
+        {layout === 'standard' ? <SNESDiagram xAction={xAction} ds={ds} colors={colors} /> : <SaturnDiagram ds={ds} colors={colors} />}
       </View>
       {/* Menu buttons */}
-      <View style={diagramStyles.menuRow}>
-        <View style={diagramStyles.menuButtonGroup}>
-          <View style={diagramStyles.menuButton}>
-            <Text style={diagramStyles.menuLabel}>Select</Text>
+      <View style={ds.menuRow}>
+        <View style={ds.menuButtonGroup}>
+          <View style={ds.menuButton}>
+            <Text style={ds.menuLabel}>Select</Text>
           </View>
-          <Text style={diagramStyles.menuAction}>Settings</Text>
+          <Text style={ds.menuAction}>Settings</Text>
         </View>
-        <View style={diagramStyles.menuButtonGroup}>
-          <View style={diagramStyles.menuButton}>
-            <Text style={diagramStyles.menuLabel}>Start</Text>
+        <View style={ds.menuButtonGroup}>
+          <View style={ds.menuButton}>
+            <Text style={ds.menuLabel}>Start</Text>
           </View>
-          <Text style={diagramStyles.menuAction}>Now Playing</Text>
+          <Text style={ds.menuAction}>Now Playing</Text>
         </View>
       </View>
     </View>
@@ -216,12 +222,18 @@ export default function SettingsScreen(): React.JSX.Element {
     seekAmount,
     largeSeekAmount,
     showButtonHints,
+    themeMode,
     setControllerLayout,
     setStandardXAction,
     setSeekAmount,
     setLargeSeekAmount,
     setShowButtonHints,
+    setThemeMode,
   } = usePlayerStore();
+
+  const styles = useThemedStyles(createStyles);
+  const diagramStyles = useThemedStyles(createDiagramStyles);
+  const colors = useThemedStyles(c => c);  // raw colors for inline use
 
   const [isScanning, setIsScanning] = useState(false);
 
@@ -248,6 +260,12 @@ export default function SettingsScreen(): React.JSX.Element {
   const toggleHints = useCallback(() => {
     setShowButtonHints(!showButtonHints);
   }, [showButtonHints, setShowButtonHints]);
+
+  const cycleTheme = useCallback(() => {
+    const modes: ThemeMode[] = ['system', 'dark', 'light'];
+    const idx = modes.indexOf(themeMode);
+    setThemeMode(modes[(idx + 1) % modes.length]);
+  }, [themeMode, setThemeMode]);
 
   const handleRescanLibrary = useCallback(async () => {
     // Request notification permission first
@@ -343,7 +361,7 @@ export default function SettingsScreen(): React.JSX.Element {
         )}
 
         {/* Controller Diagram */}
-        <ControllerDiagram layout={controllerLayout} largeSeek={largeSeekAmount} xAction={standardXAction} />
+        <ControllerDiagram layout={controllerLayout} largeSeek={largeSeekAmount} xAction={standardXAction} ds={diagramStyles} colors={colors} />
 
         {/* Seek Settings */}
         <Text style={styles.sectionTitle}>Seek</Text>
@@ -376,6 +394,20 @@ export default function SettingsScreen(): React.JSX.Element {
         <Text style={styles.sectionTitle}>Display</Text>
 
         <FocusablePressable
+          onPress={cycleTheme}
+          style={styles.optionRow}
+          focusedStyle={styles.optionFocused}
+        >
+          <View style={styles.optionContent}>
+            <Text style={styles.optionLabel}>Theme Mode</Text>
+            <Text style={styles.optionValue}>
+              {themeMode === 'system' ? 'System' : themeMode === 'dark' ? 'Dark' : 'Light'}
+            </Text>
+          </View>
+          <Text style={styles.optionChevron}>⟳</Text>
+        </FocusablePressable>
+
+        <FocusablePressable
           onPress={toggleHints}
           style={styles.optionRow}
           focusedStyle={styles.optionFocused}
@@ -395,25 +427,25 @@ export default function SettingsScreen(): React.JSX.Element {
 
 // ─── Styles ─────────────────────────────────────────────────
 
-const styles = StyleSheet.create({
+const createStyles = (c: ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: c.background,
   },
   header: {
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 12,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#222',
+    borderBottomColor: c.border,
   },
   headerTitle: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 24,
     fontWeight: '700',
   },
   headerSubtitle: {
-    color: '#555',
+    color: c.textMuted,
     fontSize: 13,
     marginTop: 4,
   },
@@ -422,7 +454,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
   sectionTitle: {
-    color: '#888',
+    color: c.textTertiary,
     fontSize: 13,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -438,28 +470,28 @@ const styles = StyleSheet.create({
     paddingVertical: 14,
     borderRadius: 8,
     marginVertical: 2,
-    backgroundColor: 'rgba(255,255,255,0.04)',
+    backgroundColor: c.surfaceDim,
   },
   optionFocused: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: c.overlayLight,
     borderWidth: 2,
-    borderColor: '#4a9eff',
+    borderColor: c.accentPrimary,
   },
   optionContent: {
     flex: 1,
   },
   optionLabel: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 15,
     fontWeight: '500',
   },
   optionValue: {
-    color: '#888',
+    color: c.textSecondary,
     fontSize: 13,
     marginTop: 2,
   },
   optionChevron: {
-    color: '#555',
+    color: c.textMuted,
     fontSize: 18,
     marginLeft: 8,
   },
@@ -467,9 +499,9 @@ const styles = StyleSheet.create({
 
 // ─── Controller Diagram Styles ──────────────────────────────
 
-const diagramStyles = StyleSheet.create({
+const createDiagramStyles = (c: ThemeColors) => StyleSheet.create({
   container: {
-    backgroundColor: 'rgba(255,255,255,0.03)',
+    backgroundColor: c.surfaceDim,
     borderRadius: 12,
     padding: 16,
     marginTop: 12,
@@ -477,7 +509,7 @@ const diagramStyles = StyleSheet.create({
     alignItems: 'center',
   },
   title: {
-    color: '#666',
+    color: c.diagramAction,
     fontSize: 12,
     fontWeight: '600',
     textTransform: 'uppercase',
@@ -498,29 +530,29 @@ const diagramStyles = StyleSheet.create({
     gap: 6,
   },
   shoulderButton: {
-    backgroundColor: 'rgba(255,255,255,0.12)',
+    backgroundColor: c.diagramChrome,
     paddingHorizontal: 14,
     paddingVertical: 6,
     borderRadius: 6,
   },
   shoulderLabel: {
-    color: '#ccc',
+    color: c.diagramLabel,
     fontSize: 11,
     fontWeight: '700',
   },
   triggerButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.diagramChromeDim,
     paddingHorizontal: 12,
     paddingVertical: 5,
     borderRadius: 6,
   },
   triggerLabel: {
-    color: '#999',
+    color: c.diagramLabelDim,
     fontSize: 10,
     fontWeight: '700',
   },
   shoulderAction: {
-    color: '#777',
+    color: c.diagramAction,
     fontSize: 10,
   },
   triggerLabelRow: {
@@ -531,7 +563,7 @@ const diagramStyles = StyleSheet.create({
     marginBottom: 4,
   },
   triggerActionText: {
-    color: '#666',
+    color: c.diagramAction,
     fontSize: 10,
   },
   // Body (d-pad + face buttons)
@@ -553,25 +585,25 @@ const diagramStyles = StyleSheet.create({
   dpadButton: {
     width: 30,
     height: 30,
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: c.diagramChrome,
     justifyContent: 'center',
     alignItems: 'center',
   },
   dpadCenter: {
     width: 30,
     height: 30,
-    backgroundColor: 'rgba(255,255,255,0.06)',
+    backgroundColor: c.diagramChromeDim,
   },
   dpadEmpty: {
     width: 30,
     height: 30,
   },
   dpadLabel: {
-    color: '#999',
+    color: c.diagramLabelDim,
     fontSize: 12,
   },
   dpadAction: {
-    color: '#777',
+    color: c.diagramAction,
     fontSize: 10,
     marginTop: 6,
   },
@@ -597,20 +629,20 @@ const diagramStyles = StyleSheet.create({
     width: 60,
   },
   diamondActionRight: {
-    color: '#777',
+    color: c.diagramAction,
     fontSize: 10,
     width: 70,
     marginLeft: 6,
   },
   diamondActionFarLeft: {
-    color: '#777',
+    color: c.diagramAction,
     fontSize: 10,
     width: 60,
     textAlign: 'right',
     marginRight: 6,
   },
   diamondActionFarRight: {
-    color: '#777',
+    color: c.diagramAction,
     fontSize: 10,
     width: 70,
     marginLeft: 6,
@@ -623,7 +655,7 @@ const diagramStyles = StyleSheet.create({
     alignItems: 'center',
   },
   faceLabel: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 13,
     fontWeight: '700',
   },
@@ -645,7 +677,7 @@ const diagramStyles = StyleSheet.create({
     alignItems: 'center',
   },
   saturnAction: {
-    color: '#777',
+    color: c.diagramAction,
     fontSize: 9,
     marginTop: 3,
   },
@@ -660,18 +692,18 @@ const diagramStyles = StyleSheet.create({
     alignItems: 'center',
   },
   menuButton: {
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: c.diagramChromeDim,
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 10,
   },
   menuLabel: {
-    color: '#999',
+    color: c.diagramLabelDim,
     fontSize: 10,
     fontWeight: '600',
   },
   menuAction: {
-    color: '#666',
+    color: c.diagramAction,
     fontSize: 9,
     marginTop: 3,
   },

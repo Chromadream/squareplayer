@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import { usePlayerStore } from '../store/playerStore';
 import type { ControllerLayout, ScreenName, StandardXAction } from '../store/playerStore';
+import { useThemedStyles } from '../theme/ThemeProvider';
 
 interface HintItem {
   button: string;
@@ -18,8 +19,6 @@ function getHints(screen: ScreenName, layout: ControllerLayout, xAction: Standar
             ? 'Favorite'
             : 'Repeat';
       const base: HintItem[] = [
-        { button: 'A', action: 'Play/Pause' },
-        { button: 'B', action: 'Back' },
         { button: 'X', action: xLabel },
         { button: 'Y', action: 'Track Info' },
         { button: 'L1', action: 'Prev' },
@@ -37,8 +36,6 @@ function getHints(screen: ScreenName, layout: ControllerLayout, xAction: Standar
     }
     case 'library': {
       const base: HintItem[] = [
-        { button: 'A', action: 'Select' },
-        { button: 'B', action: 'Back' },
         { button: 'X', action: 'Favorite' },
         { button: 'Y', action: 'Track Info' },
         { button: 'L1', action: 'Page↑' },
@@ -52,8 +49,6 @@ function getHints(screen: ScreenName, layout: ControllerLayout, xAction: Standar
     }
     case 'folder': {
       const base: HintItem[] = [
-        { button: 'A', action: 'Select' },
-        { button: 'B', action: 'Back' },
         { button: 'X', action: 'Favorite' },
         { button: 'Y', action: 'Track Info' },
         { button: 'L1', action: 'Page↑' },
@@ -86,6 +81,12 @@ export default function ButtonHintBar(): React.JSX.Element | null {
   const hints = getHints(currentScreen, controllerLayout, standardXAction);
   if (hints.length === 0) return null;
 
+  return <ButtonHintBarInner hints={hints} />;
+}
+
+function ButtonHintBarInner({ hints }: { hints: HintItem[] }): React.JSX.Element {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container}>
       {hints.map((hint, i) => (
@@ -101,42 +102,48 @@ export default function ButtonHintBar(): React.JSX.Element | null {
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: import('../theme/colors').ThemeColors) => StyleSheet.create({
   container: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     flexWrap: 'wrap',
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    gap: 2,
+    backgroundColor: c.overlayHeavy,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    gap: 4,
   },
   hintItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 3,
+    gap: 6,
   },
   buttonBadge: {
-    backgroundColor: 'rgba(255,255,255,0.15)',
-    paddingHorizontal: 6,
-    paddingVertical: 1,
-    borderRadius: 4,
-    minWidth: 22,
+    backgroundColor: c.textPrimary,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 6,
+    minWidth: 28,
     alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
   },
   buttonText: {
-    color: '#ccc',
-    fontSize: 10,
-    fontWeight: '700',
+    color: c.background,
+    fontSize: 11,
+    fontWeight: '800',
+    letterSpacing: 0.5,
   },
   actionText: {
-    color: '#888',
-    fontSize: 10,
+    color: c.textPrimary,
+    fontSize: 11,
+    fontWeight: '600',
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   separator: {
-    color: '#444',
-    fontSize: 10,
-    marginHorizontal: 4,
+    color: c.textTertiary,
+    fontSize: 12,
+    marginHorizontal: 6,
   },
 });

@@ -1,6 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
 import FocusablePressable from '../components/FocusablePressable';
+import AppHeader from '../components/AppHeader';
+import { useThemedStyles } from '../theme/ThemeProvider';
 
 interface SetupScreenProps {
   onPickFolder: () => void;
@@ -11,10 +13,11 @@ export default function SetupScreen({
   onPickFolder,
   isPicking,
 }: SetupScreenProps): React.JSX.Element {
+  const styles = useThemedStyles(createStyles);
+
   return (
     <View style={styles.container}>
-      <Text style={styles.appTitle}>squareplayer</Text>
-      <Text style={styles.subtitle}>Opinionated Music Player for Retroid Pocket Classic/Ayaneo Pocket DMG</Text>
+      <AppHeader />
 
       <FocusablePressable
         onPress={onPickFolder}
@@ -34,49 +37,36 @@ export default function SetupScreen({
   );
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: import('../theme/colors').ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: c.background,
     justifyContent: 'center',
     alignItems: 'center',
     padding: 40,
   },
-  appTitle: {
-    color: '#fff',
-    fontSize: 36,
-    fontWeight: '700',
-    marginBottom: 8,
-  },
-  subtitle: {
-    color: '#666',
-    fontSize: 14,
-    letterSpacing: 2,
-    textTransform: 'uppercase',
-    marginBottom: 48,
-  },
   button: {
-    backgroundColor: '#1a1a2e',
+    backgroundColor: c.surfaceVariant,
     paddingHorizontal: 32,
     paddingVertical: 16,
     borderRadius: 10,
     borderWidth: 2,
-    borderColor: '#333',
+    borderColor: c.border,
   },
   buttonFocused: {
-    borderColor: '#4a9eff',
-    backgroundColor: 'rgba(74, 158, 255, 0.15)',
+    borderColor: c.accentPrimary,
+    backgroundColor: c.accentPrimaryMuted,
   },
   buttonDisabled: {
     opacity: 0.5,
   },
   buttonText: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 16,
     fontWeight: '600',
   },
   hint: {
-    color: '#444',
+    color: c.textFaint,
     fontSize: 13,
     marginTop: 20,
   },

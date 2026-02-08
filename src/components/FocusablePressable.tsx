@@ -45,10 +45,10 @@ export default function FocusablePressable({
   // Programmatically grab focus when autoFocus is set (e.g. first list item)
   useEffect(() => {
     if (autoFocus && pressableRef.current) {
-      // Short delay lets the FlatList finish layout before requesting focus
+      // Delay to let scroll complete first (scroll happens at 300ms)
       const timer = setTimeout(() => {
         requestNativeFocus(pressableRef);
-      }, 100);
+      }, 300);
       return () => clearTimeout(timer);
     }
   }, [autoFocus]);

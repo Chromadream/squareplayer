@@ -11,17 +11,19 @@ import { type TrackRow, getConfig } from '../services/database';
 import { encodeContentUri } from '../utils/uri';
 import FocusablePressable from '../components/FocusablePressable';
 import { stripAudioExtension } from '../utils/audio';
+import { useThemedStyles } from '../theme/ThemeProvider';
 
 type FolderListItem =
   | { type: 'disc-header'; discNumber: number; key: string }
   | { type: 'track'; data: TrackRow; trackIndexInDisc: number; key: string };
 
 export default function FolderScreen(): React.JSX.Element {
-  const { currentFolder, currentFolderTracks, playTrack, goBack, pendingScrollAction, clearPageScroll } =
+  const { currentFolder, currentFolderTracks, playTrack, goBack, pendingScrollAction, clearPageScroll, navigateToNowPlaying } =
     usePlayerStore();
   const currentTrack = usePlayerStore(s => s.currentTrack);
   const flatListRef = useRef<FlatList>(null);
   const [scrollIndex, setScrollIndex] = useState(0);
+  const styles = useThemedStyles(createStyles);
 
   const isAlbumExperience = currentFolder?.isAlbumExperience === 1;
   const isFavoritesFolder = currentFolder?.id === -1 && currentFolder?.name === 'Favorites';
@@ -84,16 +86,20 @@ export default function FolderScreen(): React.JSX.Element {
   // Scroll to the now-playing track when the screen mounts
   useEffect(() => {
     if (autoFocusIndex > 0 && listItems.length > 0) {
+      console.log('[FolderScreen] autoFocusIndex:', autoFocusIndex, 'nowPlayingIndex:', nowPlayingIndex);
+      console.log('[FolderScreen] Item at autoFocusIndex:', listItems[autoFocusIndex]);
+      // Delay to ensure FlatList has completed layout, then scroll
       const timer = setTimeout(() => {
         flatListRef.current?.scrollToIndex({
           index: autoFocusIndex,
           animated: false,
           viewPosition: 0.3,
         });
-      }, 50);
+        console.log('[FolderScreen] Scrolled to index', autoFocusIndex);
+      }, 250);
       return () => clearTimeout(timer);
     }
-  }, [autoFocusIndex, listItems.length]);
+  }, [autoFocusIndex, listItems.length, nowPlayingIndex, listItems]);
 
   // Page scroll via store action (L1/R1)
   useEffect(() => {
@@ -115,8 +121,6 @@ export default function FolderScreen(): React.JSX.Element {
       console.log('[FolderScreen] handlePlayTrack called');
       console.log('[FolderScreen] Track:', track.fileName, 'ID:', track.id);
       console.log('[FolderScreen] isAlbumExperience:', track.isAlbumExperience);
-      console.log('[FolderScreen] currentFolderTracks length:', currentFolderTracks.length);
-      console.log('[FolderScreen] First 3 tracks:', currentFolderTracks.slice(0, 3).map(t => ({ id: t.id, fileName: t.fileName })));
       // Always pass folder tracks so d-pad navigation works in all modes
       playTrack(track, currentFolderTracks);
     },
@@ -125,7 +129,7 @@ export default function FolderScreen(): React.JSX.Element {
 
   const renderItem = useCallback(
     ({ item, index }: { item: FolderListItem; index: number }) => {
-      if (item.type === 'disc-header') {
+      if (item.type === 'disc-header' && !isFavoritesFolder) {
         return (
           <View style={styles.discHeader}>
             <View style={styles.discHeaderLine} />
@@ -137,6 +141,8 @@ export default function FolderScreen(): React.JSX.Element {
         );
       }
 
+      if (item.type !== 'track') return null;
+
       const track = item.data;
       const title = track.title ?? stripAudioExtension(track.fileName);
       const subtitle = track.artist ?? '';
@@ -144,7 +150,7 @@ export default function FolderScreen(): React.JSX.Element {
 
       return (
         <FocusablePressable
-          onPress={() => handlePlayTrack(track)}
+          onPress={isNowPlaying ? navigateToNowPlaying : () => handlePlayTrack(track)}
           style={styles.item}
           focusedStyle={styles.itemFocused}
           focusData={track}
@@ -166,18 +172,18 @@ export default function FolderScreen(): React.JSX.Element {
               </Text>
             ) : null}
           </View>
+          {!isFavoritesFolder && track.isFavorite === 1 && (
+            <Text style={styles.favoriteIcon}>⭐</Text>
+          )}
           {track.duration > 0 && (
             <Text style={styles.duration}>
               {formatDuration(track.duration)}
             </Text>
           )}
-          {!isFavoritesFolder && track.isFavorite === 1 && (
-            <Text style={styles.favoriteIcon}>⭐</Text>
-          )}
         </FocusablePressable>
       );
     },
-    [handlePlayTrack, isAlbumExperience, isFavoritesFolder, listItems, currentTrack],
+    [handlePlayTrack, isAlbumExperience, isFavoritesFolder, autoFocusIndex, currentTrack, navigateToNowPlaying],
   );
 
   const keyExtractor = useCallback(
@@ -236,6 +242,8 @@ export default function FolderScreen(): React.JSX.Element {
         keyExtractor={keyExtractor}
         contentContainerStyle={styles.listContent}
         initialNumToRender={20}
+        maxToRenderPerBatch={10}
+        windowSize={21}
         onScrollToIndexFailed={onScrollToIndexFailed}
       />
     </View>
@@ -249,16 +257,16 @@ function formatDuration(seconds: number): string {
   return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
 
-const styles = StyleSheet.create({
+const createStyles = (c: import('../theme/colors').ThemeColors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+    backgroundColor: c.background,
   },
   header: {
     flexDirection: 'row',
     padding: 20,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: '#222',
+    borderBottomColor: c.border,
     alignItems: 'center',
   },
   headerArt: {
@@ -266,18 +274,18 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 6,
     marginRight: 16,
-    backgroundColor: '#1a1a1a',
+    backgroundColor: c.surface,
   },
   headerInfo: {
     flex: 1,
   },
   headerTitle: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 20,
     fontWeight: '700',
   },
   albumExpBadge: {
-    backgroundColor: '#6c5ce7',
+    backgroundColor: c.accentBadge,
     paddingHorizontal: 8,
     paddingVertical: 2,
     borderRadius: 4,
@@ -285,13 +293,13 @@ const styles = StyleSheet.create({
     marginTop: 4,
   },
   albumExpBadgeText: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 10,
     fontWeight: '700',
     letterSpacing: 1,
   },
   headerSubtitle: {
-    color: '#777',
+    color: c.textSecondary,
     fontSize: 13,
     marginTop: 4,
   },
@@ -309,10 +317,10 @@ const styles = StyleSheet.create({
   discHeaderLine: {
     flex: 1,
     height: StyleSheet.hairlineWidth,
-    backgroundColor: '#333',
+    backgroundColor: c.borderSubtle,
   },
   discHeaderText: {
-    color: '#999',
+    color: c.textTertiary,
     fontSize: 12,
     fontWeight: '700',
     letterSpacing: 1,
@@ -329,12 +337,12 @@ const styles = StyleSheet.create({
     marginVertical: 2,
   },
   itemFocused: {
-    backgroundColor: 'rgba(255, 255, 255, 0.12)',
+    backgroundColor: c.overlayLight,
     borderWidth: 2,
-    borderColor: '#4a9eff',
+    borderColor: c.accentPrimary,
   },
   trackNumber: {
-    color: '#555',
+    color: c.textMuted,
     fontSize: 14,
     width: 30,
     textAlign: 'center',
@@ -344,17 +352,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   itemTitle: {
-    color: '#fff',
+    color: c.textPrimary,
     fontSize: 15,
     fontWeight: '500',
   },
   itemSubtitle: {
-    color: '#777',
+    color: c.textSecondary,
     fontSize: 12,
     marginTop: 2,
   },
   duration: {
-    color: '#555',
+    color: c.textMuted,
     fontSize: 13,
     marginLeft: 12,
     fontVariant: ['tabular-nums'],
@@ -368,7 +376,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 6,
     marginRight: 16,
-    backgroundColor: '#1a1a2e',
+    backgroundColor: c.surfaceVariant,
     justifyContent: 'center',
     alignItems: 'center',
   },

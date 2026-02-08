@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { StatusBar, StyleSheet, View } from 'react-native';
+import { StatusBar, StyleSheet, View, Text } from 'react-native';
 import { usePlayerStore } from './src/store/playerStore';
 import { useGamepadInput } from './src/hooks/useGamepadInput';
 import { setupPlayer } from './src/services/playback';
@@ -22,6 +22,9 @@ import SettingsScreen from './src/screens/SettingsScreen';
 import TrackInfoOverlay from './src/components/TrackInfoOverlay';
 import ButtonHintBar from './src/components/ButtonHintBar';
 import StatusOverlay from './src/components/StatusOverlay';
+import AppHeader from './src/components/AppHeader';
+import PingPongBar from './src/components/PingPongBar';
+import { ThemeProvider, useTheme } from './src/theme/ThemeProvider';
 import { Event, useTrackPlayerEvents } from 'react-native-track-player';
 
 function App(): React.JSX.Element {
@@ -30,6 +33,8 @@ function App(): React.JSX.Element {
   const [isPicking, setIsPicking] = useState(false);
   const {
     currentScreen,
+    isScanning,
+    scanProgress,
     refreshLibrary,
     setScanning,
     setMetadataProgress,
@@ -39,6 +44,8 @@ function App(): React.JSX.Element {
 
   // Set up gamepad input globally
   useGamepadInput();
+
+  const colors = useTheme();
 
   // Track playback state changes
   useTrackPlayerEvents(
@@ -175,23 +182,34 @@ function App(): React.JSX.Element {
   }, [refreshLibrary, setScanning, setMetadataProgress]);
 
   if (!isReady) {
-    return <View style={styles.container} />;
+    return (
+      <View style={[styles.loadingContainer, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.statusBarBg} />
+        <AppHeader />
+        {isScanning && (
+          <>
+            <PingPongBar color={colors.accentPrimary} trackColor={colors.surfaceVariant} />
+            <Text style={[styles.loadingProgress, { color: colors.textTertiary }]}>{scanProgress}</Text>
+          </>
+        )}
+      </View>
+    );
   }
 
   if (!hasLib) {
     return (
       <>
-        <StatusBar barStyle="light-content" backgroundColor="#0a0a0a" />
+        <StatusBar barStyle={colors.statusBarStyle} backgroundColor={colors.statusBarBg} />
         <SetupScreen onPickFolder={handlePickFolder} isPicking={isPicking} />
       </>
     );
   }
 
   return (
-    <View style={styles.container}>
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
       <StatusBar
-        barStyle="light-content"
-        backgroundColor="#000"
+        barStyle={currentScreen === 'nowplaying' ? 'light-content' : colors.statusBarStyle}
+        backgroundColor={currentScreen === 'nowplaying' ? '#000' : colors.statusBarBg}
         translucent={currentScreen === 'nowplaying'}
       />
       {currentScreen === 'nowplaying' && <NowPlayingScreen />}
@@ -208,8 +226,25 @@ function App(): React.JSX.Element {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0a',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 40,
+  },
+  loadingProgress: {
+    marginTop: 16,
+    fontSize: 13,
+    textAlign: 'center',
   },
 });
 
-export default App;
+/** Wrap in ThemeProvider so useTheme() is available everywhere. */
+export default function Root(): React.JSX.Element {
+  return (
+    <ThemeProvider>
+      <App />
+    </ThemeProvider>
+  );
+}
