@@ -22,6 +22,7 @@ export default function FolderScreen(): React.JSX.Element {
     usePlayerStore();
   const currentTrack = usePlayerStore(s => s.currentTrack);
   const flatListRef = useRef<FlatList>(null);
+  const hasInitialScrolled = useRef(false);
   const [scrollIndex, setScrollIndex] = useState(0);
   const styles = useThemedStyles(createStyles);
 
@@ -29,11 +30,13 @@ export default function FolderScreen(): React.JSX.Element {
   const isFavoritesFolder = currentFolder?.id === -1 && currentFolder?.name === 'Favorites';
 
   // Determine if multi-disc: has more than one distinct discNumber > 0
+8  // Skip for favorites folder — tracks come from different albums so disc headers make no sense
   const isMultiDisc = useMemo(() => {
+    if (isFavoritesFolder) return false;
     const discNumbers = new Set(currentFolderTracks.map(t => t.discNumber));
     // Multi-disc if there are 2+ distinct disc numbers, or exactly one disc > 1
     return discNumbers.size > 1 || (discNumbers.size === 1 && !discNumbers.has(0) && Math.max(...discNumbers) > 1);
-  }, [currentFolderTracks]);
+  }, [currentFolderTracks, isFavoritesFolder]);
 
   // Build flat list items with disc headers inserted for multi-disc folders
   const listItems: FolderListItem[] = useMemo(() => {
@@ -83,9 +86,10 @@ export default function FolderScreen(): React.JSX.Element {
     ? nowPlayingIndex
     : listItems[0]?.type === 'disc-header' ? 1 : 0;
 
-  // Scroll to the now-playing track when the screen mounts
+  // Scroll to the now-playing track when the screen mounts (once only)
   useEffect(() => {
-    if (autoFocusIndex > 0 && listItems.length > 0) {
+    if (!hasInitialScrolled.current && autoFocusIndex > 0 && listItems.length > 0) {
+      hasInitialScrolled.current = true;
       console.log('[FolderScreen] autoFocusIndex:', autoFocusIndex, 'nowPlayingIndex:', nowPlayingIndex);
       console.log('[FolderScreen] Item at autoFocusIndex:', listItems[autoFocusIndex]);
       // Delay to ensure FlatList has completed layout, then scroll
@@ -99,7 +103,7 @@ export default function FolderScreen(): React.JSX.Element {
       }, 250);
       return () => clearTimeout(timer);
     }
-  }, [autoFocusIndex, listItems.length, nowPlayingIndex, listItems]);
+  }, [autoFocusIndex, listItems.length]);
 
   // Page scroll via store action (L1/R1)
   useEffect(() => {
@@ -129,7 +133,7 @@ export default function FolderScreen(): React.JSX.Element {
 
   const renderItem = useCallback(
     ({ item, index }: { item: FolderListItem; index: number }) => {
-      if (item.type === 'disc-header' && !isFavoritesFolder) {
+      if (item.type !== 'track') {
         return (
           <View style={styles.discHeader}>
             <View style={styles.discHeaderLine} />
@@ -140,8 +144,6 @@ export default function FolderScreen(): React.JSX.Element {
           </View>
         );
       }
-
-      if (item.type !== 'track') return null;
 
       const track = item.data;
       const title = track.title ?? stripAudioExtension(track.fileName);

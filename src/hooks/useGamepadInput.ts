@@ -230,7 +230,10 @@ export function useGamepadInput(): void {
             if (isFolderRow(focused)) {
               state.openFolder(focused);
             } else if (isTrackRow(focused)) {
-              if (screen === 'folder') {
+              // If the focused track is already playing, go to now-playing screen
+              if (state.currentTrack && state.currentTrack.id === focused.id) {
+                state.navigateToNowPlaying();
+              } else if (screen === 'folder') {
                 state.playTrack(focused, state.currentFolderTracks);
               } else {
                 state.playTrack(focused);
